@@ -1,5 +1,5 @@
 """
-Microsoft Agent Framework tool functions exposed to Llama 3.2.
+Microsoft Agent Framework tool functions exposed to the configured OpenAI model.
 
 Design rule: the LLM never handles internal patient identifiers.
 

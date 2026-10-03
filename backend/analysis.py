@@ -1,5 +1,5 @@
 """
-AI analysis step (Phase 2): Llama 3.2 via Microsoft Agent Framework.
+AI analysis step (Phase 2): OpenAI via Microsoft Agent Framework.
 
 The model receives the assembled clinical context (no internal IDs) and
 returns a JSON recommendation. Its output is UNTRUSTED: it is parsed and
@@ -76,21 +76,23 @@ def build_analysis_prompt(
     )
 
 
-class OllamaClinicalAnalyzer:
-    """Default analyzer: a tool-less Agent Framework agent on Ollama."""
+class OpenAIClinicalAnalyzer:
+    """Default analyzer: a tool-less Agent Framework agent on OpenAI."""
 
-    def __init__(self, host: str | None = None, model: str | None = None) -> None:
-        self._host = host or os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        self._model = model or os.getenv("OLLAMA_MODEL", "llama3.2")
+    def __init__(self, model: str | None = None) -> None:
+        self._model = model or os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
         self._agent: Any = None
 
     def _get_agent(self) -> Any:
         if self._agent is None:
             from agent_framework import Agent
-            from agent_framework.ollama import OllamaChatClient
+            from agent_framework.openai import OpenAIChatClient
+            from backend.agent import validate_openai_configuration
+
+            validate_openai_configuration()
 
             self._agent = Agent(
-                client=OllamaChatClient(host=self._host, model=self._model),
+                client=OpenAIChatClient(model=self._model),
                 name="XVerbaClinicalAnalyst",
                 instructions=ANALYSIS_INSTRUCTIONS,
             )
@@ -109,7 +111,7 @@ class OllamaClinicalAnalyzer:
                 prompt,
                 options={"response_format": "json", "temperature": 0},
             )
-        except Exception as exc:  # network, model not pulled, timeout, ...
+        except Exception as exc:  # network, authentication, timeout, ...
             raise AnalysisUnavailableError("Clinical analysis model unavailable.") from exc
 
         return getattr(response, "text", None) or ""

@@ -57,7 +57,7 @@ HAPPY_PATH = [
 
 
 class FakeAnalyzer:
-    """Stands in for Llama 3.2. Records what context it was given."""
+    """Stands in for the configured OpenAI model. Records its context."""
 
     def __init__(self, output=None, raises=None):
         self.output = output

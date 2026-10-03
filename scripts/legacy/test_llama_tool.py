@@ -1,9 +1,7 @@
 import asyncio
-import os
-
 from dotenv import load_dotenv
 from agent_framework import Agent, tool
-from agent_framework.ollama import OllamaChatClient
+from backend.agent import _create_client
 
 load_dotenv()
 
@@ -21,10 +19,7 @@ def search_patient(name: str) -> dict:
 
 
 async def main():
-    client = OllamaChatClient(
-        host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
-        model=os.getenv("OLLAMA_MODEL", "llama3.2"),
-    )
+    client = _create_client()
 
     client.function_invocation_configuration.update(
         {

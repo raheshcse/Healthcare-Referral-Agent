@@ -1,17 +1,14 @@
 """
-Deterministic, governed healthcare referral workflow.
+Deterministic healthcare referral workflow.
 
     request
        -> deterministic patient resolution (exactly one patient)
        -> internal patient UUID (from the database, never from the LLM)
        -> referral candidate
-       -> X-Verba VSL governance  (governance.gates.governed_referral)
-       -> ALLOW    -> backend.actions.create_referral_record
-       -> DENY     -> stop, no side effect
-       -> TERMINAL -> stop, no side effect
+       -> validation and database write
 
-This is the single authoritative enforcement path for referral
-creation. Both the FastAPI ``POST /referrals`` endpoint and the
+This is the single authoritative path for referral creation.
+Both the FastAPI ``POST /referrals`` endpoint and the
 Microsoft Agent Framework ``create_referral`` tool call ``run()``.
 """
 
@@ -40,7 +37,6 @@ from backend.patient_resolution import (
     normalize_patient_id,
     resolve_patient_by_name,
 )
-from governance.gates import governed_referral
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +49,19 @@ ReferralWriter = Callable[[Session, GovernanceDecision], ReferralRecord]
 SessionFactory = Callable[[], Session]
 
 
+def _allow_governance_result() -> dict[str, Any]:
+    """No-op decision for the governance-free runtime."""
+    return {
+        "decision": "ALLOW",
+        "decision_id": "manual-no-governance",
+        "reason": "No governance layer is configured; the request was accepted.",
+    }
+
+
+async def _allow_governance_async(_candidate: dict[str, Any]) -> dict[str, Any]:
+    return _allow_governance_result()
+
+
 _RESOLUTION_TO_STATUS: dict[ResolutionStatus, WorkflowStatus] = {
     ResolutionStatus.INVALID_INPUT: WorkflowStatus.INVALID_REQUEST,
     ResolutionStatus.NOT_FOUND: WorkflowStatus.PATIENT_NOT_FOUND,
@@ -62,17 +71,17 @@ _RESOLUTION_TO_STATUS: dict[ResolutionStatus, WorkflowStatus] = {
 
 
 class ReferralWorkflow:
-    """Orchestrates one governed referral. Stateless and re-entrant."""
+    """Orchestrates one referral. Stateless and re-entrant."""
 
     def __init__(
         self,
         *,
         session_factory: SessionFactory = SessionLocal,
-        governance: GovernanceFn = governed_referral,
+        governance: GovernanceFn | None = None,
         writer: ReferralWriter = actions.create_referral_record,
     ) -> None:
         self._session_factory = session_factory
-        self._governance = governance
+        self._governance = governance or _allow_governance_async
         self._writer = writer
 
     # --------------------------------------------------------
@@ -288,23 +297,17 @@ def get_default_workflow() -> ReferralWorkflow:
 
 
 # ============================================================
-# Phase 3: governed update / cancel / clinical review request
+# Phase 3: update / cancel / clinical review request
 # ============================================================
 #
 # Same discipline as ReferralWorkflow: deterministic patient resolution
-# -> candidate -> governance.gates -> ALLOW -> backend.actions (the only
-# writer for that side effect). Never raises; failures become outcomes.
+# -> candidate -> database write. Never raises; failures become outcomes.
 
 from backend.domain import (  # noqa: E402
     ActionOutcome,
     ActionStatus,
     ReferralChangeCandidate,
     ReviewRequestCandidate,
-)
-from governance.gates import (  # noqa: E402
-    governed_referral_cancel,
-    governed_referral_update,
-    governed_review_request,
 )
 
 
@@ -339,22 +342,22 @@ _RESOLUTION_TO_ACTION_STATUS = {
 
 
 class GovernedActionWorkflow:
-    """Governed UPDATE_REFERRAL, CANCEL_REFERRAL and REQUEST_CLINICAL_REVIEW."""
+    """UPDATE_REFERRAL, CANCEL_REFERRAL and REQUEST_CLINICAL_REVIEW."""
 
     def __init__(
         self,
         *,
         session_factory: SessionFactory = SessionLocal,
-        update_governance: GovernanceFn = governed_referral_update,
-        cancel_governance: GovernanceFn = governed_referral_cancel,
-        review_governance: GovernanceFn = governed_review_request,
+        update_governance: GovernanceFn | None = None,
+        cancel_governance: GovernanceFn | None = None,
+        review_governance: GovernanceFn | None = None,
         change_writer=actions.change_referral_record,
         review_writer=actions.create_review_request_record,
     ) -> None:
         self._session_factory = session_factory
-        self._update_governance = update_governance
-        self._cancel_governance = cancel_governance
-        self._review_governance = review_governance
+        self._update_governance = update_governance or _allow_governance_async
+        self._cancel_governance = cancel_governance or _allow_governance_async
+        self._review_governance = review_governance or _allow_governance_async
         self._change_writer = change_writer
         self._review_writer = review_writer
 

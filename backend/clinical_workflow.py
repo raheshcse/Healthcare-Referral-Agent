@@ -1,24 +1,18 @@
 """
-Phase 2: governed clinical-review workflow.
+Phase 2: clinical-review workflow.
 
     Clinician request
       -> deterministic patient resolution           (backend.patient_resolution)
       -> clinical information retrieval + context    (backend.clinical_context)
       -> AI analysis / recommendation                (backend.analysis, untrusted)
       -> validated action proposal                   (backend.proposals)
-      -> X-Verba governance + side effect            (backend.workflow.ReferralWorkflow
-                                                      -> governance.gates.governed_referral
-                                                      -> backend.actions, only on ALLOW)
-      -> workflow outcome + ledger evidence
+      -> workflow execution                          (backend.workflow.ReferralWorkflow)
+      -> workflow outcome
 
 Separation of concerns:
     AI recommendation  -> text + JSON from the model (never executed)
     action proposal    -> ActionProposal built and validated in code
-    governance         -> VSL gates return ALLOW / DENY / TERMINAL
-    side effect        -> the single Phase 1 write path, reached only on ALLOW
-
-Workflow state (this module) answers "where is the business process?".
-VSL ledger evidence answers "what was decided about the automated action?".
+    workflow execution  -> deterministic side effect path
 """
 
 from __future__ import annotations
@@ -43,7 +37,6 @@ from backend.proposals import (
     validate_proposal,
 )
 from backend.workflow import ReferralWorkflow, get_default_workflow
-from governance.policy import AI_PROPOSAL_ORIGIN
 
 
 logger = logging.getLogger(__name__)
@@ -184,9 +177,9 @@ class ClinicalReviewWorkflow:
     @property
     def analyzer(self) -> ClinicalAnalyzer:
         if self._analyzer is None:
-            from backend.analysis import OllamaClinicalAnalyzer
+            from backend.analysis import OpenAIClinicalAnalyzer
 
-            self._analyzer = OllamaClinicalAnalyzer()
+            self._analyzer = OpenAIClinicalAnalyzer()
         return self._analyzer
 
     @property
@@ -364,7 +357,7 @@ class ClinicalReviewWorkflow:
                 patient_id=patient.patient_id,
                 department=proposal.department or "",
                 reason=proposal.reason or "",
-                origin=AI_PROPOSAL_ORIGIN,
+                origin="AI_PROPOSAL",
                 evidence=proposal.evidence,
                 workflow_id=result.workflow_id,
             )

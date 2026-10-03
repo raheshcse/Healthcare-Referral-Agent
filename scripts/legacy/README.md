@@ -9,4 +9,4 @@ Ad-hoc scripts from early Phase 1 development, kept for reference only.
 - Some write to the real `data/healthcare.db` and `data/ledger.jsonl`.
 
 Use `python -m pytest` for verification and `python -m scripts.run_e2e_demo`
-for the live Llama 3.2 demonstration instead.
+for the live OpenAI demonstration instead.

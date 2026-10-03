@@ -3,7 +3,7 @@ Chat service: multi-turn conversations through Microsoft Agent Framework.
 
 Per conversation (backend.conversation.Conversation):
   - an AgentSession holds the message history (user, assistant, tool calls,
-    tool results), so Llama 3.2 sees the whole conversation every turn;
+    tool results), so the configured OpenAI model sees the whole conversation every turn;
   - a ReferralContext holds the validated facts governed actions depend on
     (patient, department, reason, stage), injected into the instructions.
 
@@ -48,7 +48,6 @@ from backend.conversation import (
 )
 from backend.domain import ActionOutcome, ReferralOutcome, WorkflowStatus
 from backend.patient_resolution import ResolutionStatus, format_date_of_birth, parse_date_of_birth
-from governance.maf_gates import CLINICIAN_GUIDANCE, capture_tool_attempts
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +59,15 @@ SIDE_EFFECT_TOOLS = frozenset(
 )
 
 DECLINED_REPLY = "Understood. I won't submit that referral. Nothing was created."
+
+CLINICIAN_GUIDANCE = {
+    "patient_named_by_staff": "Please confirm the patient name exactly as it appears in the record.",
+    "patient_resolved": "Please identify the patient using a full name and date of birth if needed.",
+    "search_term_from_staff": "Please provide a clear patient name or name fragment to search.",
+    "search_term_valid": "Please give at least two characters of the patient name.",
+    "referral_confirmed": "Please confirm the referral details before submitting.",
+    "matches_confirmed_details": "Please confirm the patient and department match the referral you want to create.",
+}
 
 CAPABILITY_REPLY = (
     "I can look up patients and their clinical records, create referrals, update or "
@@ -206,6 +214,10 @@ class ChatService:
                     self._inputs(cid, message), session=conversation.session
                 )
             except Exception as exc:
+                from backend.agent import OpenAIConfigurationError
+
+                if isinstance(exc, OpenAIConfigurationError):
+                    raise
                 logger.exception("Conversation agent run failed.")
                 raise LLMUnavailableError("The language model is unavailable.") from exc
             text = getattr(response, "text", None) or ""
@@ -248,11 +260,11 @@ class ChatService:
             return ChatResult(reply=question, agent_reply=None)
 
         # 4. Tool-enabled agent with pre-tool governance.
+        attempts: list[dict[str, Any]] = []
         with (
             capture_referral_outcomes() as outcomes,
             capture_clinical_reviews() as reviews,
             capture_action_outcomes() as actions,
-            capture_tool_attempts() as attempts,
         ):
             try:
                 response = await self._get_agent().run(
@@ -260,6 +272,10 @@ class ChatService:
                 )
                 agent_reply: str | None = getattr(response, "text", None) or ""
             except Exception as exc:
+                from backend.agent import OpenAIConfigurationError
+
+                if isinstance(exc, OpenAIConfigurationError):
+                    raise
                 logger.exception("Agent run failed.")
                 if not outcomes and not reviews and not actions:
                     raise LLMUnavailableError(

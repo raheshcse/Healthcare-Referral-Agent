@@ -2,14 +2,14 @@
 
 <p align="center">
   <strong>Governed AI for Consequential Healthcare Workflows</strong><br/>
-  <sub>Microsoft Agent Framework · Llama 3.2 · X-Verba VSL · FastAPI · SQLite · React · Synthea</sub>
+  <sub>Microsoft Agent Framework · OpenAI API · X-Verba VSL · FastAPI · SQLite · React · Synthea</sub>
 </p>
 
 <p align="center">
 
 ![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)
 ![Microsoft Agent Framework](https://img.shields.io/badge/Microsoft%20Agent%20Framework-Agent%20Orchestration-5C2D91)
-![Llama 3.2](https://img.shields.io/badge/Llama%203.2-Ollama-7F52FF)
+![OpenAI](https://img.shields.io/badge/OpenAI-API-412991)
 ![X-Verba VSL](https://img.shields.io/badge/X--Verba-VSL%20Governance-0B8F55)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Data%20Layer-003B57?logo=sqlite&logoColor=white)
@@ -50,7 +50,7 @@
 
 The **X-Verba Healthcare Referral Agent** shows a practical architecture for AI agents in workflows where an AI-initiated action changes system state, here creating, updating or cancelling a patient referral.
 
-Clinical staff talk to the assistant in natural language. A local **Llama 3.2** model, running through **Microsoft Agent Framework (MAF)**, interprets the request and chooses tools. **X-Verba VSL** governance then decides, before anything happens, whether each tool call and each consequential action is allowed. Every decision is written to an append-only, hash-chained ledger.
+Clinical staff talk to the assistant in natural language. The configured **OpenAI** model, running through **Microsoft Agent Framework (MAF)**, interprets the request and chooses tools. **X-Verba VSL** governance then decides, before anything happens, whether each tool call and each consequential action is allowed. Every decision is written to an append-only, hash-chained ledger.
 
 ```text
 AI interprets intent
@@ -76,7 +76,7 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 | Explicit confirmation | A referral built up over several messages is submitted only after "yes, go ahead". "No", "cancel" or "never mind" withdraws it |
 | Patient lookup and clinical data | Read-only tools for the patient summary, conditions, medications, allergies, observations and encounters |
 | Governed referral actions | Create, update and cancel referrals, and request a human clinical review |
-| AI clinical review (decision support) | Llama 3.2 reviews the record and may propose a referral, which is then validated and governed |
+| AI clinical review (decision support) | The configured OpenAI model reviews the record and may propose a referral, which is then validated and governed |
 | Governance & Review Console | A separate `/engineering` view of every decision, with its ledger entries, causal links and hash-chain integrity |
 | Fail-closed behaviour | Unknown, ambiguous or invented inputs, governance errors and tool failures never produce a write or a success message |
 
@@ -101,7 +101,7 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ Microsoft Agent Framework · Ollama · Llama 3.2 (backend/agent.py)│
+│ Microsoft Agent Framework · OpenAI API · gpt-4.1-mini (backend/agent.py)│
 │   one AgentSession per conversation · 12 tools                   │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼  every proposed tool call
@@ -133,7 +133,7 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 
 | Layer | Responsibility |
 |---|---|
-| **Llama 3.2 / Ollama** | Understanding language, choosing tools, writing replies. Untrusted |
+| **OpenAI / gpt-4.1-mini** | Understanding language, choosing tools, writing replies. Untrusted |
 | **Microsoft Agent Framework** | Agent loop, tool invocation, session history, middleware |
 | **Conversation layer** | Structured referral state, deterministic slot filling, confirmation, pronoun resolution |
 | **Application workflows** | Deterministic patient resolution, candidate construction, AI-output validation |
@@ -148,7 +148,7 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 ### Conversation state
 
 - `POST /chat` takes an optional `conversation_id`. If it is omitted, a new conversation starts; the response returns the id together with a clinician-safe `context` (patient name, department, reason, what is still missing, stage). The UI keeps the id and offers **New conversation**.
-- Each conversation has one MAF `AgentSession`, so Llama 3.2 sees the earlier turns. `ReferralContext` (`backend/conversation.py`) holds the validated facts: patient, department, reason and stage `IDLE → COLLECTING → READY → CONFIRMED → SUBMITTED`. These facts are injected into the model's instructions on every turn.
+- Each conversation has one MAF `AgentSession`, so the configured OpenAI model sees the earlier turns. `ReferralContext` (`backend/conversation.py`) holds the validated facts: patient, department, reason and stage `IDLE → COLLECTING → READY → CONFIRMED → SUBMITTED`. These facts are injected into the model's instructions on every turn.
 - Clearly supplied answers ("Aisha Wiegand.", "Cardiology.", "She has chest pain.") are captured deterministically, and the next missing item is asked for without calling the model. Known facts are never asked for again, and a reason is never invented.
 - Department aliases are understood ("haematology", "ENT", "cardiac clinic"). An unsupported department ("XYZ") is answered with the list of supported departments.
 - **Confirmation:**
@@ -293,7 +293,7 @@ Each accepts a `GovernanceDecision` (never raw fields) and refuses anything othe
 
 ```text
 Patient resolution (deterministic) → clinical record (Synthea) → bounded context (no IDs)
-   → Llama 3.2 analysis (JSON, UNTRUSTED) → validated ActionProposal (backend/proposals.py)
+   → OpenAI analysis (JSON, UNTRUSTED) → validated ActionProposal (backend/proposals.py)
    → X-Verba action governance (origin = AI_PROPOSAL) → ALLOW: referral written · DENY: REVIEW_REQUIRED · TERMINAL
 ```
 
@@ -351,11 +351,11 @@ Swagger UI: `http://127.0.0.1:8000/docs`
 | `GET` | `/clinical-review-requests?limit=` | Human clinical review queue (read-only) |
 | `GET` | `/patients?name=&limit=` · `/patients/{patient_id}` | Patient search and summary |
 | `GET` | `/governance?limit=` · `/governance/{decision_id}` | Governance decisions and ledger evidence |
-| `GET` | `/health` | Liveness of the API process. It does not check Ollama |
+| `GET` | `/health` | Liveness of the API process. It does not check OpenAI connectivity |
 
 Updates, cancellations and review requests are made through the assistant's governed tools. They have no separate REST endpoint.
 
-`POST /referrals` outcomes: `REFERRAL_CREATED` 201 · `PATIENT_NOT_FOUND` 404 · `MULTIPLE_PATIENT_MATCHES` 409 · `INVALID_REQUEST` / `INVALID_PATIENT_ID` 422 · `GOVERNANCE_DENIED` / `GOVERNANCE_TERMINAL` 403 · `INTERNAL_ERROR` 500. `/chat` returns `503 LLM_UNAVAILABLE` when Ollama cannot be reached.
+`POST /referrals` outcomes: `REFERRAL_CREATED` 201 · `PATIENT_NOT_FOUND` 404 · `MULTIPLE_PATIENT_MATCHES` 409 · `INVALID_REQUEST` / `INVALID_PATIENT_ID` 422 · `GOVERNANCE_DENIED` / `GOVERNANCE_TERMINAL` 403 · `INTERNAL_ERROR` 500. `/chat` returns `503 LLM_UNAVAILABLE` when OpenAI is unavailable or `OPENAI_API_KEY` is not configured.
 
 `POST /chat` response:
 
@@ -426,7 +426,7 @@ Commands are for **Windows PowerShell** from the project root.
 
 - Python 3.10+
 - Node.js 20.19+ or 22.12+ (required by Vite)
-- [Ollama](https://ollama.com) with the `llama3.2` model
+- An [OpenAI API key](https://platform.openai.com/api-keys)
 - Git, which is needed to install `vsl-maf` from GitHub
 
 ### 1. Python environment
@@ -435,7 +435,7 @@ Commands are for **Windows PowerShell** from the project root.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env      # Ollama host and model (defaults: localhost:11434, llama3.2)
+Copy-Item .env.example .env      # Set OPENAI_API_KEY; model defaults to gpt-4.1-mini
 ```
 
 ### 2. Synthetic patient database
@@ -450,13 +450,14 @@ python -m scripts.validate_data       # optional sanity report
 
 To regenerate the population from Synthea, generate FHIR output into `synthea/output/fhir/`, run `python -m scripts.extract_synthea_data`, and then load the database again as above.
 
-### 3. Ollama
+### 3. OpenAI configuration
 
 ```powershell
-ollama pull llama3.2
+notepad .env
 ```
 
-Keep Ollama running. The first request after start-up can be slow while the model loads.
+Set `OPENAI_API_KEY` in `.env`. `OPENAI_CHAT_MODEL` is optional and defaults to
+`gpt-4.1-mini`. The backend is the only component that reads this key.
 
 ### 4. API
 
@@ -493,7 +494,7 @@ This **renames** `data/ledger.jsonl` to `data/ledger-archive-<timestamp>.jsonl`,
 python -m scripts.run_e2e_demo
 ```
 
-This runs referral, not-found, TERMINAL and AI-review scenarios against the live Llama 3.2 model, and writes to `data/`.
+This runs referral, not-found, TERMINAL and AI-review scenarios against the configured OpenAI model, and writes to `data/`.
 
 ---
 
@@ -532,7 +533,7 @@ Two notes for presenters:
 | Frontend lint | `cd frontend; npm run lint` | clean |
 | Frontend build | `cd frontend; npm run build` | succeeds |
 
-The backend suite runs against a **temporary database and ledger** (`tests/conftest.py`), so `data/` is never touched. It exercises the real MAF function-invocation loop, the real vsl-maf middleware, the real workflows and the real VSL gates and ledger. Only Llama 3.2 is replaced by scripted chat clients.
+The backend suite runs against a **temporary database and ledger** (`tests/conftest.py`), so `data/` is never touched. It exercises the real MAF function-invocation loop, the real vsl-maf middleware, the real workflows and the real VSL gates and ledger. OpenAI is replaced by scripted chat clients.
 
 | Test file | Focus |
 |---|---|
@@ -547,9 +548,9 @@ The backend suite runs against a **temporary database and ledger** (`tests/conft
 | `test_action_governance.py` | Create / update / cancel / review-request governance, duplicates, TERMINAL invariants |
 | `test_proposals.py`, `test_clinical_workflow.py`, `test_clinical_api.py` | AI output validation, workflow states, idempotency |
 
-**Browser checks.** During development the UI was also exercised end to end in a headless Chromium (Playwright): 170 checks across the clinician app and the console, covering Phases 1–3, against the real backend with a scripted stand-in for Llama 3.2. That harness is not part of this repository.
+**Browser checks.** During development the UI was also exercised end to end in a headless Chromium (Playwright): 170 checks across the clinician app and the console, covering Phases 1–3, against the real backend with a scripted model client. That harness is not part of this repository.
 
-**Live model.** Llama 3.2 behaviour itself is not covered by the automated suites. Verify it with Ollama running, using the demo guide or `scripts/run_e2e_demo.py`.
+**Live model.** OpenAI model behaviour itself is not covered by the automated suites. Verify it with `OPENAI_API_KEY` configured, using the demo guide or `scripts/run_e2e_demo.py`.
 
 ---
 
@@ -561,14 +562,14 @@ X-Verba-Healthcare-Referral-Agent/
 │   ├── app.py                  # FastAPI endpoints
 │   ├── chat.py                 # ChatService: routing, authoritative replies
 │   ├── conversation.py         # conversation state, slot filling, confirmation
-│   ├── agent.py                # MAF agent (Ollama · Llama 3.2) + instructions
+│   ├── agent.py                # MAF agent (OpenAI API · gpt-4.1-mini) + instructions
 │   ├── agent_tools.py          # the 12 agent tools
 │   ├── workflow.py             # ReferralWorkflow, GovernedActionWorkflow
 │   ├── actions.py              # the single governed writer
 │   ├── patient_resolution.py   # deterministic name → patient
 │   ├── clinical_workflow.py    # AI clinical review workflow + states
 │   ├── clinical_context.py     # record retrieval, bounded context
-│   ├── analysis.py             # Llama 3.2 analysis (untrusted)
+│   ├── analysis.py             # OpenAI analysis (untrusted)
 │   ├── proposals.py            # AI output → validated proposal; department catalogue
 │   ├── clinical_runs.py        # workflow run persistence
 │   ├── domain.py, schemas.py   # domain types, API schemas
@@ -587,7 +588,7 @@ X-Verba-Healthcare-Referral-Agent/
 ├── scripts/
 │   ├── create_database.py, load_database.py, validate_data.py, extract_synthea_data.py
 │   ├── reset_demo_data.py      # archive ledger + clear governed records
-│   ├── run_e2e_demo.py         # live Llama 3.2 demonstration
+│   ├── run_e2e_demo.py         # live OpenAI demonstration
 │   └── legacy/                 # early ad-hoc scripts, not maintained
 ├── tests/                      # pytest suites (temporary DB and ledger)
 ├── docs/                       # technical report (.docx) + screenshots (see Evidence collected)
@@ -619,7 +620,7 @@ X-Verba-Healthcare-Referral-Agent/
 - `clinical_review_requests` is a queue only; there is no reviewer screen.
 
 **Behavioural boundaries:**
-- Llama 3.2 (3B) can over-call tools or phrase things poorly. Governance and the fixed replies contain this, but live model behaviour is not covered by the automated suites.
+- Any LLM can over-call tools or phrase things poorly. Governance and the fixed replies contain this, but live model behaviour is not covered by the automated suites.
 - Slot filling is deterministic and English-only. Anything it doesn't recognise goes to the model, which is still governed.
 - A **patient review** that governance allows creates the referral it proposes without a separate confirmation step (Phase 2 design).
 - Grounding rules check *where* an input came from and *whether* evidence exists. They do not judge clinical appropriateness.
@@ -628,7 +629,7 @@ X-Verba-Healthcare-Referral-Agent/
 
 **Operational:**
 - Conversations live in server memory: they are lost on restart and expire after 2 hours. An unknown or expired `conversation_id` silently starts a new conversation.
-- `/health` reports API liveness only. It does not check Ollama or the database.
+- `/health` reports API liveness only. It does not check OpenAI connectivity or the database.
 - The `/chat` response also carries patient IDs inside its structured result objects for API consumers. The clinician UI never displays them.
 - Synthetic records can contain sensitive findings, as Synthea generates them. Choose demo questions accordingly.
 
@@ -685,3 +686,5 @@ This project uses synthetic healthcare data generated for development and demons
 Built as part of the **X-Verba / Super Semantics** AI governance work. It demonstrates governed AI workflows on Microsoft Agent Framework, with an emphasis on deterministic execution, governance enforcement, auditability and safe control of consequential actions.
 
 > **AI can reason about an action. The governed system decides whether that action can execute.**
+#   H e a l t h c a r e - R e f e r r a l - A g e n t  
+ 

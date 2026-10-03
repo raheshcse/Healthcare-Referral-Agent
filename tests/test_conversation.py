@@ -1,8 +1,8 @@
 """
 Phase 3: multi-turn conversational context.
 
-The model is a scripted stand-in (Ollama is not reachable in CI); these
-tests prove the plumbing that makes Llama 3.2 context-aware:
+The model is a scripted stand-in (OpenAI is not contacted in CI); these
+tests prove the plumbing that makes the model context-aware:
   - one MAF AgentSession per conversation (history reaches the model),
   - structured ReferralContext (patient / department / reason / stage),
   - per-turn state injection into the model's instructions,

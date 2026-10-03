@@ -11,7 +11,7 @@ import axios from "axios";
 
 import { classifyFailure } from "./lib/outcomes.js";
 
-const CHAT_TIMEOUT_MS = 120_000; // local Llama 3.2 can be slow on first load
+const CHAT_TIMEOUT_MS = 120_000; // allows time for tool calls and OpenAI responses
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 const api = axios.create({

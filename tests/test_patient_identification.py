@@ -1,7 +1,7 @@
 """
 Structured patient identification in conversation.
 
-The model is a scripted stand-in for Llama 3.2. These tests prove that:
+The model is a scripted stand-in for OpenAI. These tests prove that:
   - patient identity is kept as structured fields (name, date of birth,
     patient ID) and never merged into one string;
   - an ambiguous or unknown patient gets a clear, deterministic reply that

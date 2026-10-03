@@ -12,7 +12,7 @@ async def main():
     agent = create_agent()
 
     print("Agent created successfully.")
-    print("Sending request to local Ollama model...\n")
+    print("Sending request to the configured OpenAI model...\n")
 
     result = await agent.run(
         "Say hello and explain in one sentence "

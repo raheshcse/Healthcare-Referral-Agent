@@ -4,7 +4,7 @@ Microsoft Agent Framework integration.
 These tests drive the REAL Agent Framework function-invocation loop,
 the REAL vsl-maf VSLFunctionMiddleware and the REAL tools. Only the
 language model is replaced by a scripted chat client, so the tests are
-deterministic and do not need Ollama.
+deterministic and do not need a live OpenAI connection.
 """
 
 from __future__ import annotations
@@ -26,12 +26,22 @@ from governance.maf_gates import GOVERNED_TOOL_MIDDLEWARE, referral_vsl_middlewa
 from tests.conftest import AISHA_ID, referral_count
 
 
+def test_openai_configuration_fails_clearly_without_a_key(monkeypatch):
+    """The backend never falls back to an undocumented local provider."""
+
+    from backend.agent import OpenAIConfigurationError, validate_openai_configuration
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(OpenAIConfigurationError, match="OPENAI_API_KEY is not configured"):
+        validate_openai_configuration()
+
+
 class ScriptedChatClient(
     FunctionInvocationLayer,
     ChatMiddlewareLayer,
     BaseChatClient,
 ):
-    """Stands in for Llama 3.2: emits a scripted tool call, then text."""
+    """Stands in for OpenAI: emits a scripted tool call, then text."""
 
     def __init__(self, script: list[Any]) -> None:
         super().__init__()

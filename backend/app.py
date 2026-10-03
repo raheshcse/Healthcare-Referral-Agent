@@ -1,16 +1,15 @@
 """
-X-Verba Healthcare Referral Agent - FastAPI application.
+Healthcare Referral Agent - FastAPI application.
 
     React / client
         -> FastAPI (this module)
         -> ReferralWorkflow / ChatService
         -> Microsoft Agent Framework (chat only)
-        -> X-Verba VSL governance
         -> healthcare tools
         -> SQLite
 
-Governed referral creation is only reachable through
-``ReferralWorkflow.run``. No route writes referrals directly.
+Referral creation is reachable through ``ReferralWorkflow.run``.
+No route writes referrals directly.
 """
 
 from __future__ import annotations
@@ -26,6 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from backend.agent import OpenAIConfigurationError
 from backend.chat import ChatService, LLMUnavailableError
 from backend.clinical_workflow import (
     ClinicalReviewRequest,
@@ -45,12 +45,8 @@ from backend.schemas import (
     ClinicalWorkflowListResponse,
     ClinicalWorkflowRequest,
     ClinicalWorkflowResponse,
-    DecisionListItem,
-    DecisionListResponse,
     ErrorResponse,
-    GovernanceDecisionResponse,
     HealthResponse,
-    LedgerEntryView,
     PatientDetailResponse,
     PatientSearchResponse,
     PatientSummary,
@@ -59,12 +55,6 @@ from backend.schemas import (
 )
 from backend.tools.patient_tools import get_patient
 from backend.workflow import ReferralWorkflow, get_default_workflow
-from governance.ledger import (
-    entries_for_decision,
-    ledger_integrity_ok,
-    recent_decisions,
-    summarize_decision,
-)
 
 
 logger = logging.getLogger("xverba.api")
@@ -108,12 +98,11 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(
-    title="X-Verba Healthcare Referral Agent API",
+    title="Healthcare Referral Agent API",
     version="1.0.0",
     description=(
-        "Governed healthcare referral API. Referrals are created only "
-        "through the deterministic workflow: patient resolution -> "
-        "X-Verba VSL governance -> ALLOW -> database write."
+        "Healthcare referral API. Referrals are created through a "
+        "deterministic workflow: patient resolution -> database write."
     ),
     lifespan=lifespan,
 )
@@ -231,11 +220,13 @@ async def chat(
 ) -> ChatResponse | JSONResponse:
     try:
         result = await service.chat(body.message, body.conversation_id)
+    except OpenAIConfigurationError:
+        return _error(503, "LLM_UNAVAILABLE", "OPENAI_API_KEY is not configured.")
     except LLMUnavailableError:
         return _error(
             503,
             "LLM_UNAVAILABLE",
-            "The language model is unavailable. Check that Ollama is running.",
+            "The language model is unavailable. Check the OpenAI API configuration and connectivity.",
         )
 
     workflow_results = [ReferralResponse.from_outcome(o) for o in result.workflow_results]
@@ -458,57 +449,3 @@ async def get_patient_information(
 
     return PatientDetailResponse.model_validate(details)
 
-
-@app.get(
-    "/governance",
-    response_model=DecisionListResponse,
-    tags=["governance"],
-    summary="List recent governance decisions recorded in the VSL ledger",
-)
-async def list_governance_decisions(
-    limit: int = Query(20, ge=1, le=100),
-) -> DecisionListResponse:
-    return DecisionListResponse(
-        ledger_integrity=ledger_integrity_ok(),
-        decisions=[DecisionListItem(**d) for d in recent_decisions(limit)],
-    )
-
-
-@app.get(
-    "/governance/{decision_id}",
-    response_model=GovernanceDecisionResponse,
-    tags=["governance"],
-    summary="Retrieve governance decision evidence from the VSL ledger",
-    responses=_ERRORS,
-)
-async def get_governance_decision(
-    decision_id: str = Path(..., max_length=64),
-) -> GovernanceDecisionResponse | JSONResponse:
-    if normalize_patient_id(decision_id) is None:  # same canonical UUID shape
-        return _error(422, "INVALID_DECISION_ID", "decision_id must be a UUID.")
-
-    entries = entries_for_decision(decision_id.strip().lower())
-
-    if not entries:
-        return _error(404, "DECISION_NOT_FOUND", "No ledger evidence for this decision_id.")
-
-    summary = summarize_decision(entries)
-
-    return GovernanceDecisionResponse(
-        decision_id=decision_id,
-        ledger_integrity=ledger_integrity_ok(),
-        entries=[
-            LedgerEntryView(
-                entry_id=e.entry_id,
-                sequence=e.sequence,
-                entry_type=e.entry_type.value,
-                timestamp=e.timestamp,
-                caused_by=e.caused_by,
-                payload=e.payload,
-                entry_hash=e.entry_hash,
-                prev_hash=e.prev_hash,
-            )
-            for e in entries
-        ],
-        **summary,
-    )

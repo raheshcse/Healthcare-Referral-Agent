@@ -1,13 +1,13 @@
 """
-Live end-to-end demonstration (requires Ollama running with llama3.2).
+Live end-to-end demonstration (requires OPENAI_API_KEY in .env).
 
-    1. Doctor request -> Llama 3.2 -> deterministic patient resolution
+    1. Doctor request -> OpenAI -> deterministic patient resolution
        -> referral candidate -> vsl-maf / X-Verba VSL -> ALLOW -> SQLite
     2. Doctor request for a nonexistent patient -> workflow detects
        PATIENT_NOT_FOUND -> no referral
     3. Referral candidate for a nonexistent patient ID -> VSL
        -> TERMINAL -> no database write
-    4. Phase 2 clinical review via the agent (Llama 3.2 analysis ->
+    4. Phase 2 clinical review via the agent (OpenAI analysis ->
        validated proposal -> X-Verba governance -> ALLOW/DENY)
     5. Phase 2 clinical review via the workflow service directly
 
@@ -60,13 +60,13 @@ async def main() -> None:
     ensure_schema()
     service = ChatService()
 
-    # 1. Positive scenario through Llama 3.2
+    # 1. Positive scenario through OpenAI
     before = referral_count()
     result = await service.chat(
         "Please refer Aisha Wiegand to Cardiology because of persistent "
         "chest pain on exertion."
     )
-    show("SCENARIO 1 - valid patient via Llama 3.2", {
+    show("SCENARIO 1 - valid patient via OpenAI", {
         "reply": result.reply,
         "agent_reply": result.agent_reply,
         "workflow_results": [o.to_dict() for o in result.workflow_results],
@@ -75,12 +75,12 @@ async def main() -> None:
     for outcome in result.workflow_results:
         evidence(outcome.governance.decision_id if outcome.governance else None)
 
-    # 2. Nonexistent patient through Llama 3.2
+    # 2. Nonexistent patient through OpenAI
     before = referral_count()
     result = await service.chat(
         "Refer Zebulon Nobody to Neurology for recurrent migraines."
     )
-    show("SCENARIO 2 - nonexistent patient via Llama 3.2", {
+    show("SCENARIO 2 - nonexistent patient via OpenAI", {
         "reply": result.reply,
         "workflow_results": [o.to_dict() for o in result.workflow_results],
         "referrals_created": referral_count() - before,
@@ -101,12 +101,12 @@ async def main() -> None:
     })
     evidence(outcome.governance.decision_id if outcome.governance else None)
 
-    # 4. Phase 2: governed clinical review through Llama 3.2 (agent path)
+    # 4. Phase 2: governed clinical review through OpenAI (agent path)
     before = referral_count()
     result = await service.chat(
         "Review Aisha Wiegand and determine whether a cardiology referral is appropriate."
     )
-    show("SCENARIO 4 - Phase 2 clinical review via Llama 3.2 (agent)", {
+    show("SCENARIO 4 - Phase 2 clinical review via OpenAI (agent)", {
         "reply": result.reply,
         "agent_reply": result.agent_reply,
         "clinical_reviews": [r.to_dict() for r in result.clinical_reviews],

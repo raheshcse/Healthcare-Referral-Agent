@@ -13,9 +13,6 @@ data/healthcare.db
 *.sqlite
 *.sqlite3
 
-# VSL runtime ledger
-data/ledger.jsonl
-
 # Synthea source repository
 /synthea/
 

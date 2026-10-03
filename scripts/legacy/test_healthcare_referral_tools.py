@@ -1,7 +1,7 @@
 import asyncio
 
 from agent_framework import Agent
-from agent_framework.ollama import OllamaChatClient
+from backend.agent import _create_client
 
 from backend.agent_tools import (
     search_patient,
@@ -11,10 +11,7 @@ from backend.agent_tools import (
 
 async def main():
 
-    client = OllamaChatClient(
-        host="http://localhost:11434",
-        model="llama3.2",
-    )
+    client = _create_client()
 
     client.function_invocation_configuration.update(
         {

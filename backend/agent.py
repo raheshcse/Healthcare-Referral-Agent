@@ -5,26 +5,27 @@ import os
 from dotenv import load_dotenv
 
 from agent_framework import Agent
-from agent_framework.ollama import OllamaChatClient
+from agent_framework.openai import OpenAIChatClient
 
 from backend.agent_tools import AGENT_TOOLS
 from backend.conversation import build_context_provider
-
-from governance.maf_gates import GOVERNED_TOOL_MIDDLEWARE
 
 
 load_dotenv()
 
 
-OLLAMA_HOST = os.getenv(
-    "OLLAMA_HOST",
-    "http://localhost:11434",
-)
+OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4.1-mini")
 
-OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL",
-    "llama3.2",
-)
+
+class OpenAIConfigurationError(RuntimeError):
+    """Raised before a request when the backend has no OpenAI credentials."""
+
+
+def validate_openai_configuration() -> None:
+    """Fail clearly without ever including a credential in an error or log."""
+
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        raise OpenAIConfigurationError("OPENAI_API_KEY is not configured.")
 
 
 AGENT_INSTRUCTIONS = """
@@ -100,17 +101,15 @@ reply and must not claim that you did.
 """
 
 
-def _create_client() -> OllamaChatClient:
-    return OllamaChatClient(
-        host=OLLAMA_HOST,
-        model=OLLAMA_MODEL,
-    )
+def _create_client() -> OpenAIChatClient:
+    validate_openai_configuration()
+    return OpenAIChatClient(model=OPENAI_CHAT_MODEL)
 
 
 def create_conversation_agent() -> Agent:
     """
     Tool-less agent for general conversation. It has no tools, so it
-    cannot resolve patients, invoke workflows or touch governance.
+    cannot resolve patients or invoke workflows.
     """
 
     return Agent(
@@ -143,8 +142,6 @@ def create_agent() -> Agent:
         name="XVerbaHealthcareReferralAgent",
         instructions=AGENT_INSTRUCTIONS,
         tools=AGENT_TOOLS,
-        # Pre-tool X-Verba governance for every tool (vsl-maf).
-        middleware=list(GOVERNED_TOOL_MIDDLEWARE),
         # Structured conversation state, injected every turn.
         context_providers=[build_context_provider()],
     )
