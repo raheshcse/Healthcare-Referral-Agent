@@ -1,8 +1,8 @@
-# X-Verba Healthcare Referral Agent
+# Healthcare Referral Agent
 
 <p align="center">
   <strong>Governed AI for Consequential Healthcare Workflows</strong><br/>
-  <sub>Microsoft Agent Framework · OpenAI API · X-Verba VSL · FastAPI · SQLite · React · Synthea</sub>
+  <sub>Microsoft Agent Framework · OpenAI API ·   · FastAPI · SQLite · React · Synthea</sub>
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)
 ![Microsoft Agent Framework](https://img.shields.io/badge/Microsoft%20Agent%20Framework-Agent%20Orchestration-5C2D91)
 ![OpenAI](https://img.shields.io/badge/OpenAI-API-412991)
-![X-Verba VSL](https://img.shields.io/badge/X--Verba-VSL%20Governance-0B8F55)
+![ ](https://img.shields.io/badge/X--Verba-%20Governance-0B8F55)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Data%20Layer-003B57?logo=sqlite&logoColor=white)
 ![Synthea](https://img.shields.io/badge/Synthea-Synthetic%20Data-F59E0B)
@@ -19,7 +19,6 @@
 
 > **Demonstration build (Phases 1–3).** A governed referral assistant for clinical staff, running entirely locally on **synthetic Synthea patient data**. It is not a clinical system: no real patient data, no diagnosis, and not for patient care.
 
-> 📄 **Technical Architecture, Governance & Real-World Healthcare AI Safety Report (v1.0, October 2026):** [`docs/X-Verba-Healthcare-Referral-Agent-Technical-Governance-Report.docx`](docs/X-Verba-Healthcare-Referral-Agent-Technical-Governance-Report.docx). It is a 69-page architecture and governance document with diagrams, screenshot evidence analysis, a real-world healthcare AI risk analysis, and the proposed production architecture and roadmap.
 
 ---
 
@@ -29,12 +28,10 @@
 2. [What the product does](#what-the-product-does)
 3. [Architecture](#architecture)
 4. [Conversation and tool flow](#conversation-and-tool-flow)
-5. [Governance model](#governance-model)
 6. [Clinical review workflow (AI proposals)](#clinical-review-workflow-ai-proposals)
 7. [User interfaces](#user-interfaces)
 8. [API](#api)
 9. [Governance scenarios tested](#governance-scenarios-tested)
-10. [Evidence collected](#evidence-collected)
 11. [Setup and running locally](#setup-and-running-locally)
 12. [Client demo guide](#client-demo-guide)
 13. [Testing](#testing)
@@ -48,18 +45,18 @@
 
 ## Executive summary
 
-The **X-Verba Healthcare Referral Agent** shows a practical architecture for AI agents in workflows where an AI-initiated action changes system state, here creating, updating or cancelling a patient referral.
+The **Healthcare Referral Agent** shows a practical architecture for AI agents in workflows where an AI-initiated action changes system state, here creating, updating or cancelling a patient referral.
 
-Clinical staff talk to the assistant in natural language. The configured **OpenAI** model, running through **Microsoft Agent Framework (MAF)**, interprets the request and chooses tools. **X-Verba VSL** governance then decides, before anything happens, whether each tool call and each consequential action is allowed. Every decision is written to an append-only, hash-chained ledger.
+Clinical staff talk to the assistant in natural language. The configured **OpenAI** model, running through **Microsoft Agent Framework (MAF)**, interprets the request and chooses tools. ** ** governance then decides, before anything happens, whether each tool call and each consequential action is allowed. Every decision is written to an append-only, hash-chained ledger.
 
 ```text
 AI interprets intent
         ↓
-X-Verba governs the model's tool call          (pre-tool governance)
+ governs the model's tool call          (pre-tool governance)
         ↓
 Application deterministically prepares the action
         ↓
-X-Verba governs the action itself               (action governance)
+ governs the action itself               (action governance)
         ↓
 Only ALLOW reaches the side effect  →  ledger evidence for every decision
 ```
@@ -77,7 +74,7 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 | Patient lookup and clinical data | Read-only tools for the patient summary, conditions, medications, allergies, observations and encounters |
 | Governed referral actions | Create, update and cancel referrals, and request a human clinical review |
 | AI clinical review (decision support) | The configured OpenAI model reviews the record and may propose a referral, which is then validated and governed |
-| Governance & Review Console | A separate `/engineering` view of every decision, with its ledger entries, causal links and hash-chain integrity |
+| Review Console | A separate `/engineering` view of every decision, with its ledger entries, causal links and hash-chain integrity |
 | Fail-closed behaviour | Unknown, ambiguous or invented inputs, governance errors and tool failures never produce a write or a success message |
 
 ---
@@ -90,55 +87,45 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ React frontend   Clinician app  /     ·   Governance console /engineering │
+│ React frontend   Clinician app /   ·   Review console /engineering│
 └───────────────────────────────┬──────────────────────────────────┘
-                                ▼  (frontend/src/api.js only)
+                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │ FastAPI (backend/app.py)                                         │
-│   /chat → ChatService (backend/chat.py)                          │
-│     • conversation state (backend/conversation.py)               │
-│     • deterministic capture of patient / department / reason     │
+│   /chat → ChatService                                            │
+│   conversation state + deterministic patient / referral capture  │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ Microsoft Agent Framework · OpenAI API · gpt-4.1-mini (backend/agent.py)│
+│ Microsoft Agent Framework · OpenAI API · gpt-4.1-mini             │
 │   one AgentSession per conversation · 12 tools                   │
 └───────────────────────────────┬──────────────────────────────────┘
-                                ▼  every proposed tool call
+                                ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ PRE-TOOL GOVERNANCE  vsl-maf VSLFunctionMiddleware               │
-│   governance/maf_gates.py · PreNodes → ALLOW / DENY (ledgered)   │
-│   DENY ⇒ the tool body never runs                                │
-└───────────────────────────────┬──────────────────────────────────┘
-                                ▼  ALLOW
-┌──────────────────────────────────────────────────────────────────┐
-│ DETERMINISTIC WORKFLOWS  backend/workflow.py, clinical_workflow.py│
-│   patient resolution → candidate → (AI proposal validation)      │
+│ TOOL VALIDATION                                                   │
+│   proposed tool calls are checked before execution                │
+│   invalid requests are blocked before the tool runs              │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ ACTION GOVERNANCE  governance/gates.py + governance/policy.py    │
-│   PreNodes → Invariants → ALLOW / DENY / TERMINAL (ledgered)     │
-└──────────────┬─────────────────────────────────┬─────────────────┘
-             ALLOW                         DENY / TERMINAL
-               ▼                                 ▼
-┌────────────────────────────┐         ┌──────────────────────┐
-│ backend/actions.py         │         │  No side effect      │
-│ single writer → SQLite     │         │  Clinician told why  │
-└────────────────────────────┘         └──────────────────────┘
-               │
-               ▼
-     VSL ledger (data/ledger.jsonl): MONITOR → PRE_NODE → VERIFICATION → [TERMINAL]
+│ DETERMINISTIC WORKFLOWS                                          │
+│   patient resolution → candidate → AI proposal validation         │
+└───────────────────────────────┬──────────────────────────────────┘
+                                ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ APPLICATION ACTIONS (backend/actions.py)                         │
+│   validated actions → SQLite                                     │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 | Layer | Responsibility |
 |---|---|
-| **OpenAI / gpt-4.1-mini** | Understanding language, choosing tools, writing replies. Untrusted |
-| **Microsoft Agent Framework** | Agent loop, tool invocation, session history, middleware |
-| **Conversation layer** | Structured referral state, deterministic slot filling, confirmation, pronoun resolution |
-| **Application workflows** | Deterministic patient resolution, candidate construction, AI-output validation |
-| **X-Verba VSL** | Pre-tool and action governance; ALLOW / DENY / TERMINAL; ledger evidence |
-| **`backend/actions.py`** | The only code that writes referrals and review requests, and only with an ALLOW decision |
+| **OpenAI / gpt-4.1-mini** | Understanding language, choosing tools and writing replies |
+| **Microsoft Agent Framework** | Agent loop, tool invocation, session history and middleware |
+| **Conversation layer** | Structured referral state, deterministic slot filling, confirmation and pronoun resolution |
+| **Application workflows** | Deterministic patient resolution, candidate construction and AI-output validation |
+| **Tool validation** | Prevents invalid or unsupported tool requests from executing |
+| **`backend/actions.py`** | Controlled writer for referrals and review requests |
 | **SQLite + Synthea** | Synthetic patient records and referral persistence |
 
 ---
@@ -190,103 +177,6 @@ When a governed workflow runs, the clinician's reply is built from its actual ou
 
 ---
 
-## Governance model
-
-### Concepts
-
-| VSL construct | Meaning here | Result when it fails |
-|---|---|---|
-| **PreNode** | Request validation: is this request well-formed, grounded and permitted? | **DENY**. Nothing happens; the clinician can correct the request |
-| **Invariant** | Integrity condition that must never be violated | **TERMINAL**. The action is halted and a TerminalState is recorded |
-| **TerminalState** | `referral-action-suspended`, `patient-context-integrity-violation` | Needs human attention |
-| **ALLOW** | Every PreNode passed and every Invariant held | The side effect may run |
-
-### Two governance layers
-
-1. **Pre-tool governance** (`governance/maf_gates.py`). Every tool the model proposes passes through `GovernedToolMiddleware`, a `vsl-maf` `VSLFunctionMiddleware`, **before** the tool body runs. The decision is recorded as action `TOOL_CALL`; the MONITOR entry records the tool and, for clinical-data tools, the patient accessed. On DENY the tool body never executes.
-2. **Action governance** (`governance/gates.py`). The resolved side-effect candidate is governed again with PreNodes and Invariants. The two layers evaluate different inputs: pre-tool checks the model's proposal, while action governance checks the resolved record.
-
-### Rules and why each exists
-
-| Rule | Type | Applies to | Why it exists |
-|---|---|---|---|
-| `PATIENT_SEARCH_REQUEST_VALID` | PreNode (pre-tool) | `search_patient` | The model may only search for a name the staff member typed, not trawl records with invented queries |
-| `CLINICAL_DATA_ACCESS_VALID` | PreNode (pre-tool) | data tools, AI review | Clinical data is read only for a patient the staff member named who resolves to exactly one record |
-| `ACTION_INPUT_GROUNDED` | PreNode (pre-tool) | create / update / cancel / review request | Patient, reason and referral number must come from the staff member, never from the model or a placeholder like "Unknown" |
-| `REFERRAL_INTENT_COMPLETE` | PreNode (pre-tool) | `create_referral` | Patient, department and reason must all be present |
-| `REFERRAL_CONFIRMED_BY_STAFF` | PreNode (pre-tool) | `create_referral` | A referral prepared in conversation is submitted only after the clinician confirmed it, and only for the confirmed patient and department |
-| `REFERRAL_REQUEST_VALID` | PreNode | create | The candidate is complete and well-formed |
-| `REFERRAL_TARGET_VALID` | PreNode | create | Only supported departments can receive referrals |
-| `AI_PROPOSAL_GROUNDED` | PreNode | AI-originated create | Every piece of evidence the AI cites must exist **in this patient's** record |
-| `REFERRAL_NOT_DUPLICATE` | PreNode | create; update that changes department | Prevents a second active (PENDING) referral to the same department |
-| `REFERRAL_UPDATE_VALID` | PreNode | update | The referral exists, is still active, and a real, valid change was requested |
-| `REFERRAL_CANCEL_VALID` | PreNode | cancel | The referral exists, is still active, and a cancellation reason was given |
-| `CLINICAL_REVIEW_REQUEST_VALID` | PreNode | review request | Has a reason, does not duplicate an open request, and any cited referral exists |
-| `PATIENT_MUST_EXIST` | Invariant → `referral-action-suspended` | all actions | An action for a patient record that cannot be verified is an integrity failure |
-| `GOVERNANCE_CONTEXT_MUST_MATCH_PATIENT` | Invariant → `patient-context-integrity-violation` | AI-originated create | The AI proposal must concern the same patient its workflow resolved |
-| `REFERRAL_MUST_BELONG_TO_PATIENT` | Invariant → `patient-context-integrity-violation` | update / cancel / review request | A referral can never be changed under another patient's name |
-
-The rules are declared in `governance/policy.py`, which imports only `vsl_core`. The facts they evaluate are computed in `governance/gates.py` (database) and `governance/maf_gates.py` (conversation).
-
-### Decision order per action
-
-| Action | PreNodes (in order) | Invariants |
-|---|---|---|
-| `TOOL_CALL` | per tool (see Agent tools) | none |
-| `CREATE_REFERRAL` | `REFERRAL_REQUEST_VALID` → `REFERRAL_TARGET_VALID` → [`AI_PROPOSAL_GROUNDED`] → `REFERRAL_NOT_DUPLICATE` | `PATIENT_MUST_EXIST` → [`GOVERNANCE_CONTEXT_MUST_MATCH_PATIENT`] |
-| `UPDATE_REFERRAL` | `REFERRAL_UPDATE_VALID` → [`REFERRAL_NOT_DUPLICATE` if department changes] | `PATIENT_MUST_EXIST`, `REFERRAL_MUST_BELONG_TO_PATIENT` |
-| `CANCEL_REFERRAL` | `REFERRAL_CANCEL_VALID` | `PATIENT_MUST_EXIST`, `REFERRAL_MUST_BELONG_TO_PATIENT` |
-| `REQUEST_CLINICAL_REVIEW` | `CLINICAL_REVIEW_REQUEST_VALID` | `PATIENT_MUST_EXIST`, [`REFERRAL_MUST_BELONG_TO_PATIENT`] |
-
-Bracketed items apply only to AI-originated proposals or when the condition is met.
-
-### Ledger evidence
-
-Every decision is written to the VSL ledger (`data/ledger.jsonl`, append-only and hash-chained) under one `decision_id`:
-
-```text
-MONITOR                         action, patient, tool / department / changes
- ├─ PRE_NODE  (caused_by MONITOR)        → VERIFICATION (caused_by PRE_NODE)  outcome: passed
- ├─ PRE_NODE  ...                        → VERIFICATION                       outcome: passed
- └─ PRE_NODE  (last)                     → VERIFICATION  outcome: approved | denied
-                                           or  VERIFICATION INSUFFICIENT (outcome: invariant_violated)
-                                                 └─ TERMINAL (caused_by VERIFICATION)  terminal_state
-```
-
-Observed shapes, verified against the current code:
-
-| Decision | Entries |
-|---|---|
-| Pre-tool `search_patient` / data tool | `MONITOR, PRE_NODE, VERIFICATION` (3) |
-| Pre-tool `create_referral` ALLOW | `MONITOR` + 3 × (`PRE_NODE, VERIFICATION`) (7) |
-| Clinician referral ALLOW, or DENY on duplicate | `MONITOR` + 3 × (`PRE_NODE, VERIFICATION`) (7) |
-| Referral DENY on unsupported department | `MONITOR` + 2 × (`PRE_NODE, VERIFICATION`) (5) |
-| Referral TERMINAL (`PATIENT_MUST_EXIST`) | `MONITOR` + 3 × (`PRE_NODE, VERIFICATION`) + `TERMINAL` (8) |
-| AI-originated referral ALLOW | `MONITOR` + 4 × (`PRE_NODE, VERIFICATION`) (9) |
-| Update / cancel / review request ALLOW | `MONITOR, PRE_NODE, VERIFICATION` (3); 5 when an update changes department |
-| Cancel under another patient's name (TERMINAL) | `MONITOR, PRE_NODE, VERIFICATION, TERMINAL` (4) |
-
-**Traceability.** New referrals and review requests store their `governance_decision_id`. Clinical workflow runs store the decision id, and their MONITOR stores the `workflow_id`. For updates the MONITOR records the referral number and the before/after values; for cancellations, the referral number and the cancellation reason.
-
-**Audit status.**
-- `ledger.verify_integrity()` passes: the hash chain is intact.
-- `ledger.audit()` passes these checks:
-  - every drift-flagged MONITOR has a PreNode;
-  - every PRE_NODE has a VERIFICATION.
-- The monitoring-gap check runs only when a gap threshold is supplied.
-- The two human-authorisation checks (`SPECIFICATION_UPDATE` after `INSUFFICIENT`, `HUMAN_AUTHORISED_TRANSITION` after `TERMINAL`) **fail whenever the ledger contains a TERMINAL decision**. This is by design, because human authorisation is not implemented yet (see Limitations).
-
-### Enforcement boundary
-
-`backend/actions.py` is the single writer:
-- `create_referral_record` for new referrals
-- `change_referral_record` for updates and cancellations
-- `create_review_request_record` for review requests
-
-Each accepts a `GovernanceDecision` (never raw fields) and refuses anything other than ALLOW for its own candidate type. Governance exceptions fail closed: no write, and an `INTERNAL_ERROR` outcome.
-
----
-
 ## Clinical review workflow (AI proposals)
 
 *"Review Aisha Wiegand and determine whether a cardiology referral is appropriate."*
@@ -294,7 +184,7 @@ Each accepts a `GovernanceDecision` (never raw fields) and refuses anything othe
 ```text
 Patient resolution (deterministic) → clinical record (Synthea) → bounded context (no IDs)
    → OpenAI analysis (JSON, UNTRUSTED) → validated ActionProposal (backend/proposals.py)
-   → X-Verba action governance (origin = AI_PROPOSAL) → ALLOW: referral written · DENY: REVIEW_REQUIRED · TERMINAL
+   →  action governance (origin = AI_PROPOSAL) → ALLOW: referral written · DENY: REVIEW_REQUIRED · TERMINAL
 ```
 
 - **Proposal validation.** Only `CREATE_REFERRAL` or `NO_ACTION` and only supported departments are accepted. A department the clinician named cannot be changed by the AI. Any `patient_id`, `uuid` or `referral_id` the AI supplies is ignored and recorded. Text containing a UUID is rejected. Malformed output becomes `INVALID_PROPOSAL`, and governance is never called.
@@ -323,18 +213,17 @@ The React/Vite frontend (`frontend/`) has two **separate** surfaces. Both talk o
 - **Request status**: *Request received → Patient identified → Safety & governance checks → Referral / Change recorded*, driven by the backend's real outcome.
 - **Referral result** and **This session**: outcome cards for referrals, updates, cancellations and review requests.
 
-What the clinician sees is derived from backend **status codes** (`src/lib/outcomes.js`, unit tested). HTTP 200 alone is never treated as success, and the clinician view never shows patient UUIDs, decision IDs, hashes, VSL rule names or stack traces. Blocked outcomes use plain language, for example *"Duplicate referral blocked"*, *"Department not supported"* or *"The referral was blocked by the governance workflow."*
+What the clinician sees is derived from backend **status codes** (`src/lib/outcomes.js`, unit tested). HTTP 200 alone is never treated as success, and the clinician view never shows patient UUIDs, decision IDs, hashes,  rule names or stack traces. Blocked outcomes use plain language, for example *"Duplicate referral blocked"*, *"Department not supported"* or *"The referral was blocked by the governance workflow."*
 
-### Governance & Review Console: `/engineering`
+### Review Console: `/engineering`
 
-For AI engineers and governance reviewers:
+For developers and reviewers:
 
-- **Governance decisions**: recent decisions (action, tool, department) with a hash-chain integrity badge. Lookup by decision id (deep link `/engineering?decision=<id>`) shows:
-  - the ALLOW / DENY / TERMINAL badge, the action, the tool, the PreNode, the Invariant and the TerminalState;
-  - every ledger entry, with `caused_by` links resolved, hashes and payloads;
-  - an explanation matched to the action (pre-tool call, create, update, cancel or review request).
-- **Clinical workflows**: AI review runs with state transitions, the validated proposal, ignored AI fields, the raw (untrusted) AI output, and links to the governance evidence.
-- TERMINAL decisions state plainly that no human-authorised transition is recorded. The console is read-only and **not yet access-controlled**.
+- Recent workflow activity and application outcomes.
+- Clinical workflow runs with state transitions and validated proposals.
+- Read-only operational information for troubleshooting and demonstrations.
+
+The console is not access-controlled in this demonstration build.
 
 ---
 
@@ -350,7 +239,6 @@ Swagger UI: `http://127.0.0.1:8000/docs`
 | `GET` | `/clinical-workflows?limit=` · `/clinical-workflows/{workflow_id}` | Workflow runs and transitions |
 | `GET` | `/clinical-review-requests?limit=` | Human clinical review queue (read-only) |
 | `GET` | `/patients?name=&limit=` · `/patients/{patient_id}` | Patient search and summary |
-| `GET` | `/governance?limit=` · `/governance/{decision_id}` | Governance decisions and ledger evidence |
 | `GET` | `/health` | Liveness of the API process. It does not check OpenAI connectivity |
 
 Updates, cancellations and review requests are made through the assistant's governed tools. They have no separate REST endpoint.
@@ -393,28 +281,7 @@ Each scenario is covered by automated tests that run against a temporary databas
 | 14 | Model text claims success after a denial or a tool failure | Fixed "No referral or change was made…" reply | reply policy | `test_conversation`, `test_chat_intent` |
 | 15 | Malformed AI output / AI-supplied UUIDs | `INVALID_PROPOSAL` / fields ignored; governance not called | proposal validation | `test_proposals`, `test_clinical_api` |
 | 16 | Clinical review request: valid, duplicate, missing reason, unknown referral number | ALLOW / DENY | `CLINICAL_REVIEW_REQUEST_VALID` | `test_action_governance` |
-| 17 | Ledger integrity and causal links for every decision type | Chain intact; links resolve within the decision | VSL ledger | `test_ledger`, `test_action_governance`, `test_tool_governance` |
-
----
-
-## Evidence collected
-
-- **Automated evidence (current):** the test suites listed above, all passing (see Testing).
-- **Detailed evidence analysis:** section 23 of the [technical report](docs/X-Verba-Healthcare-Referral-Agent-Technical-Governance-Report.docx) documents every screenshot scenario. For each it gives the input, the decision reached, the ledger entries, whether governance was reached, and what the screenshot does and does not prove.
-- **UI screenshots, `docs/UI evidence/`.** Captured by hand during Phase 3 testing, **before** the client-readiness fixes. Panel wording such as "did not request a referral" and the console's "Direct request (Phase 1 path)" label have since been corrected, so recapture these before showing them to a client.
-
-  | File | Shows |
-  |---|---|
-  | `ev 1.png`, `ev 1.1.png` | Patient search in chat; console: `TOOL_CALL search_patient` ALLOW (`PATIENT_SEARCH_REQUEST_VALID`) |
-  | `Scenario 2*.png` | Invented patient: assistant reports not found; console shows the search decision |
-  | `Scenario 3*.png` | Clinical data without a patient: DENY `CLINICAL_DATA_ACCESS_VALID` |
-  | `Scenario 4*.png` | Unsupported department, before the fix: the assistant only asked "Which department?" (it now names the department as unsupported and lists the valid ones) |
-  | `Scenario 5*.png`, `Scenario 8*.png` | Duplicate referral: DENY `REFERRAL_NOT_DUPLICATE` (7 ledger entries) |
-  | `Scenario 6*.png` | Update without a referral number: DENY `ACTION_INPUT_GROUNDED` |
-  | `Scenario 7*.png` | Cancellation without a referral number: DENY `ACTION_INPUT_GROUNDED` |
-  | `Scenario 9*.png` | `pytest tests\test_action_governance.py -v` output, including the TERMINAL tests |
-
-- **`docs/evidence/` (historical, Phase 1).** Early infographics and screenshots from Phase 1. They show ledger shapes and tool signatures that predate the current implementation (for example `create_referral(patient_id=…)` and 3- or 4-entry decisions). Some are illustrative rather than literal ledger output. Treat them as history, not current evidence.
+| 17 | Ledger integrity and causal links for every decision type | Chain intact; links resolve within the decision |  ledger | `test_ledger`, `test_action_governance`, `test_tool_governance` |
 
 ---
 
@@ -427,7 +294,7 @@ Commands are for **Windows PowerShell** from the project root.
 - Python 3.10+
 - Node.js 20.19+ or 22.12+ (required by Vite)
 - An [OpenAI API key](https://platform.openai.com/api-keys)
-- Git, which is needed to install `vsl-maf` from GitHub
+- Git, which is needed to install `-maf` from GitHub
 
 ### 1. Python environment
 
@@ -474,7 +341,7 @@ npm run dev
 ```
 
 - Clinician app: `http://localhost:5173/`
-- Governance console: `http://localhost:5173/engineering`
+- Review console: `http://localhost:5173/engineering`
 
 The Vite server proxies `/api/*` to `http://127.0.0.1:8000`; set `XVERBA_API_TARGET` to change this.
 
@@ -486,7 +353,7 @@ Stop the API first, then run:
 python -m scripts.reset_demo_data --yes
 ```
 
-This **renames** `data/ledger.jsonl` to `data/ledger-archive-<timestamp>.jsonl`, so earlier evidence is kept. It also removes referrals, review requests and workflow runs, so referral numbers, workflow links and the ledger start fresh together. Patient data is not touched.
+This **renames** `data/` to `data/application audit data`, so earlier evidence is kept. It also removes referrals, review requests and workflow runs, so referral numbers, workflow links and the ledger start fresh together. Patient data is not touched.
 
 ### 7. Live end-to-end script (optional)
 
@@ -533,7 +400,7 @@ Two notes for presenters:
 | Frontend lint | `cd frontend; npm run lint` | clean |
 | Frontend build | `cd frontend; npm run build` | succeeds |
 
-The backend suite runs against a **temporary database and ledger** (`tests/conftest.py`), so `data/` is never touched. It exercises the real MAF function-invocation loop, the real vsl-maf middleware, the real workflows and the real VSL gates and ledger. OpenAI is replaced by scripted chat clients.
+The backend suite runs against a **temporary database and ledger** (`tests/conftest.py`), so `data/` is never touched. It exercises the real MAF function-invocation loop, the real -maf middleware, the real workflows and the real  gates and ledger. OpenAI is replaced by scripted chat clients.
 
 | Test file | Focus |
 |---|---|
@@ -557,7 +424,7 @@ The backend suite runs against a **temporary database and ledger** (`tests/conft
 ## Project structure
 
 ```text
-X-Verba-Healthcare-Referral-Agent/
+Healthcare-Referral-Agent/
 ├── backend/
 │   ├── app.py                  # FastAPI endpoints
 │   ├── chat.py                 # ChatService: routing, authoritative replies
@@ -575,16 +442,11 @@ X-Verba-Healthcare-Referral-Agent/
 │   ├── domain.py, schemas.py   # domain types, API schemas
 │   ├── tools/patient_tools.py  # read-only clinical data access
 │   └── database/               # SQLAlchemy models, connection, schema
-├── governance/
-│   ├── policy.py               # VSL PreNodes, Invariants, TerminalStates (vsl_core only)
-│   ├── gates.py                # action governance + decision engine (ledger writes)
-│   ├── maf_gates.py            # pre-tool governance (vsl-maf middleware)
-│   └── ledger.py               # VSL ledger + read-only evidence helpers
 ├── frontend/src/
 │   ├── api.js                  # the only backend client
 │   ├── lib/                    # outcome mapping, ledger helpers (+ tests)
 │   ├── clinician/              # /             clinician app
-│   └── engineering/            # /engineering  governance console
+│   └── engineering/            # /engineering  Review console
 ├── scripts/
 │   ├── create_database.py, load_database.py, validate_data.py, extract_synthea_data.py
 │   ├── reset_demo_data.py      # archive ledger + clear governed records
@@ -592,7 +454,7 @@ X-Verba-Healthcare-Referral-Agent/
 │   └── legacy/                 # early ad-hoc scripts, not maintained
 ├── tests/                      # pytest suites (temporary DB and ledger)
 ├── docs/                       # technical report (.docx) + screenshots (see Evidence collected)
-├── data/                       # processed CSVs, healthcare.db, ledger.jsonl
+├── data/                       # processed CSVs, healthcare.db, application audit data
 ├── main.py · requirements.txt · requirements-lock.txt · pytest.ini · .env.example
 ```
 
@@ -600,14 +462,13 @@ X-Verba-Healthcare-Referral-Agent/
 
 ## Design principles
 
-- **Governance before side effect.** Every consequential action is decided before it executes, and every tool call is decided before it runs.
-- **Fail closed.** Governance errors, unresolved patients, invented inputs and tool failures never become successful actions or success messages.
+- **Validate before side effects.** Consequential actions are checked before they execute.
+- **Fail closed.** Unresolved patients, invalid inputs and tool failures do not become successful actions.
 - **Deterministic identity.** The LLM never supplies or selects patient identifiers.
-- **No guessing.** An ambiguous patient is never resolved arbitrarily, and no reason is ever invented.
-- **The clinician confirms.** A conversational referral is submitted only after explicit confirmation.
-- **Truthful replies.** What the clinician reads comes from actual outcomes, not from model claims.
-- **Traceability.** Every decision has linked ledger evidence; records link back to their decisions.
-- **Separation of concerns.** Authentication and authorisation (future) stay distinct from AI governance.
+- **No guessing.** Ambiguous patients are never resolved arbitrarily, and reasons are never invented.
+- **The clinician confirms.** Conversational referrals require confirmation where appropriate.
+- **Truthful replies.** User-facing results come from actual backend outcomes, not model claims.
+- **Separation of concerns.** AI reasoning, application workflows and persistence remain separate.
 
 ---
 
@@ -635,43 +496,18 @@ X-Verba-Healthcare-Referral-Agent/
 
 ---
 
-## Real-world applicability
-
-The same boundary pattern applies wherever an AI system proposes an action that changes a clinical or administrative system. In a production organisation, X-Verba would sit between the **AI proposal** and the **real-world side effect**:
-
-```text
-EHR / EMR → clinical / administrative workflow → AI agent → structured action proposal
-   → X-Verba governance boundary
-       ├── identity / context checks      (implemented: patient context)
-       ├── policy PreNodes                (implemented)
-       ├── safety Invariants              (implemented: integrity invariants)
-       ├── evidence verification          (implemented: grounding)
-       ├── risk classification            (proposed)
-       ├── human review requirement       (proposed)
-       └── authorisation / role controls  (proposed)
-   → ALLOW / DENY / TERMINAL / HUMAN_REVIEW (proposed) → controlled action → audit / ledger
-```
-
-The technical report (section 32) analyses the Mayo Clinic Platform article *"Are We Deploying AI Algorithms Without Appropriate Oversight?"* (Halamka & Cerrato, 29 June 2026). Its examples include an LLM's advice in a breech/VBAC case, Stanford's ChatEHR evaluation, an AI sepsis alert recommending IV fluids for a patient with a dialysis catheter, and Mayo's review-before-use and proactive-human-review policies. The report maps each one to the type of control a production system would need, and states clearly what this prototype implements today.
-
-An appropriately configured X-Verba governance boundary could provide controls relevant to this class of risk. It does not guarantee patient safety, and the current project does not handle treatment, medication or order workflows.
-
----
-
 ## Roadmap
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1. Healthcare Referral Agent | Governed referral workflow, patient resolution, VSL ledger, UI and console | ✅ Implemented |
-| 2. Clinical Workflow / Clinical Review | AI clinical review, proposal validation and grounding, workflow tracking | ✅ Implemented |
-| 3. Conversation and tool governance | Multi-turn state, confirmation, structured name + DOB, pre-tool governance on all tools, update/cancel/review actions | ✅ Implemented |
-| 4. Identity / RBAC | Authentication, roles, service identity, governance authorisation context | 🔜 Proposed |
-| 5. Human-in-the-loop governance | Risk classification, review queue and screen, auditable reviewer decisions, escalation | 🔜 Proposed |
-| 6. Production data integration | EHR/EMR via FHIR, enterprise identity, durable ledger | 🔜 Proposed |
-| 7. Advanced governance | Policy versioning, risk tiers, model/version tracking, evidence lineage, governance analytics | 🔜 Proposed |
-| 8. Cloud / DevOps | Containers, CI/CD, cloud deployment, secrets, monitoring, disaster recovery | 🔜 Proposed |
-
-Every enhancement should strengthen the governance boundary rather than route around it. New tools get pre-tool PreNodes. New side effects get a decision-carrying writer. New protected conditions become Invariants. New human decisions become ledger events.
+| 1. Healthcare Referral Agent | Referral workflow, patient resolution and UI | ✅ Implemented |
+| 2. Clinical Workflow / Clinical Review | AI clinical review, proposal validation and workflow tracking | ✅ Implemented |
+| 3. Conversation and tool handling | Multi-turn state, confirmation, structured name + DOB, update/cancel/review actions | ✅ Implemented |
+| 4. Identity / RBAC | Authentication, roles and service identity | 🔜 Proposed |
+| 5. Human-in-the-loop | Review queue, reviewer decisions and escalation | 🔜 Proposed |
+| 6. Production data integration | EHR/EMR via FHIR and enterprise identity | 🔜 Proposed |
+| 7. Observability and analytics | Operational dashboards, model/version tracking and evidence lineage | 🔜 Proposed |
+| 8. Cloud / DevOps | Containers, CI/CD, secrets, monitoring and disaster recovery | 🔜 Proposed |
 
 ---
 
@@ -681,10 +517,8 @@ This project uses synthetic healthcare data generated for development and demons
 
 ---
 
-## X-Verba / Super Semantics
+## Healthcare Referral Agent
 
-Built as part of the **X-Verba / Super Semantics** AI governance work. It demonstrates governed AI workflows on Microsoft Agent Framework, with an emphasis on deterministic execution, governance enforcement, auditability and safe control of consequential actions.
+Built as a demonstration of AI-assisted healthcare referral workflows using Microsoft Agent Framework, OpenAI, FastAPI, React and synthetic Synthea data.
 
-> **AI can reason about an action. The governed system decides whether that action can execute.**
-#   H e a l t h c a r e - R e f e r r a l - A g e n t  
- 
+> **AI can reason about an action. The application validates and controls whether that action can execute.**
