@@ -4,7 +4,7 @@ Chat service: multi-turn conversations through Microsoft Agent Framework.
 Per conversation (backend.conversation.Conversation):
   - an AgentSession holds the message history (user, assistant, tool calls,
     tool results), so the configured OpenAI model sees the whole conversation every turn;
-  - a ReferralContext holds the validated facts governed actions depend on
+  - a ReferralContext holds the validated facts actions depend on
     (patient, department, reason, stage), injected into the instructions.
 
 Turn routing:
@@ -13,11 +13,11 @@ Turn routing:
     that is still missing details
                           -> deterministic next question (no model call; the
                              exchange is added to the history on the next run)
-  - everything else       -> tool-enabled agent with pre-tool governance
+  - everything else       -> tool-enabled agent with application validation
 
 Replies are derived from the authoritative workflow / action outcomes
-whenever a governed workflow ran, never from the model's claims. If a
-side-effecting tool was attempted but produced no outcome (governance
+whenever a workflow ran, never from the model's claims. If a
+side-effecting tool was attempted but produced no outcome (validation
 denied it before it ran, or it failed), the reply says so deterministically:
 the model's text is never allowed to claim a result that did not happen.
 """
@@ -52,7 +52,7 @@ from backend.patient_resolution import ResolutionStatus, format_date_of_birth, p
 
 logger = logging.getLogger(__name__)
 
-# Tools whose purpose is a governed side effect (or a governed workflow).
+# Tools whose purpose is a side effect (or a workflow).
 SIDE_EFFECT_TOOLS = frozenset(
     {"create_referral", "update_referral", "cancel_referral", "request_clinical_review",
      "review_patient_for_referral"}
@@ -259,7 +259,7 @@ class ChatService:
             self._pending.setdefault(cid, []).extend([_user_message(message), _assistant_message(question)])
             return ChatResult(reply=question, agent_reply=None)
 
-        # 4. Tool-enabled agent with pre-tool governance.
+        # 4. Tool-enabled agent with application validation.
         attempts: list[dict[str, Any]] = []
         with (
             capture_referral_outcomes() as outcomes,
@@ -284,7 +284,7 @@ class ChatService:
                 agent_reply = None
 
         # Authoritative reply: built from actual workflow results whenever a
-        # governed workflow ran, never from the model's own claims.
+        # workflow ran, never from the model's own claims.
         parts = (
             [r.message for r in reviews]
             + [_describe(o) for o in outcomes]
@@ -420,7 +420,7 @@ def unsupported_department_reply(department: str) -> str:
 
 
 def _unfinished_action_reply(attempts: list[dict]) -> str:
-    """A governed action was attempted but produced no outcome."""
+    """An action was attempted but produced no outcome."""
 
     relevant = [a for a in attempts if a["tool"] in SIDE_EFFECT_TOOLS]
     if any(a["executed"] and a["error"] for a in relevant):

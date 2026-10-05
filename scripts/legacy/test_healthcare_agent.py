@@ -5,7 +5,7 @@ from backend.agent import create_agent
 
 async def main() -> None:
     print("=" * 70)
-    print("X-VERBA HEALTHCARE REFERRAL AGENT")
+    print("HEALTHCARE REFERRAL AGENT")
     print("=" * 70)
 
     agent = create_agent()

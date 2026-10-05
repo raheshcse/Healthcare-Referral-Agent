@@ -9,14 +9,13 @@ Two kinds of memory, deliberately separate:
    model sees the whole conversation on every turn.
 
 2. Structured workflow state - owned by the application (ReferralContext).
-   The facts a governed action depends on (which patient, which department,
+   The facts an action depends on (which patient, which department,
    what reason, what stage) are kept as validated fields, NOT inferred from
    free text each time. The resolved patient's internal UUID lives only
    here; the model only ever sees the name.
 
 The state is injected into the model's instructions every turn by
-ReferralContextProvider, and is also used by the pre-tool governance gates
-(governance.maf_gates) to decide whether a tool input is grounded in what
+ReferralContextProvider to decide whether a tool input is grounded in what
 the staff member actually said.
 """
 
@@ -279,7 +278,7 @@ class ReferralContext:
         elif self.intent == "REVIEW":
             lines.append("Current task: reviewing whether a referral is appropriate.")
         elif self.stage == "SUBMITTED" and self.last_outcome:
-            lines.append(f"The last governed action finished with outcome {self.last_outcome}.")
+            lines.append(f"The last action finished with outcome {self.last_outcome}.")
 
         return "\n".join(lines)
 
@@ -302,7 +301,7 @@ class Conversation:
     def staff_words(self) -> set[str]:
         return {w for message in self.staff_messages for w in words(message)}
 
-    # ---- grounding facts (used by governance.maf_gates) ------------
+    # ---- grounding facts --------------------------------------------
 
     def patient_named_by_staff(self, patient_name: str | None) -> bool:
         """True when the name (or pronoun) refers to a patient the staff member named."""
@@ -442,7 +441,7 @@ class ConversationStore:
 # Current conversation (per chat turn)
 # ============================================================
 
-_current: ContextVar[Conversation | None] = ContextVar("xverba_conversation", default=None)
+_current: ContextVar[Conversation | None] = ContextVar("healthcare_referral_conversation", default=None)
 
 
 @contextmanager
@@ -462,7 +461,7 @@ def current_conversation() -> Conversation | None:
 # Deterministic slot filling (conservative)
 # ============================================================
 #
-# The model handles open-ended language. The fields a governed action
+# The model handles open-ended language. The fields an action
 # depends on are additionally captured deterministically when the staff
 # member's message clearly supplies them, so a short answer such as
 # "Cardiology." or "Aisha Wiegand." is never lost or re-asked.
@@ -788,7 +787,7 @@ def build_context_provider():
 
     class ReferralContextProvider(ContextProvider):
         def __init__(self) -> None:
-            super().__init__(source_id="xverba_referral_context")
+            super().__init__(source_id="healthcare_referral_context")
 
         async def before_run(self, *, agent, session, context, state) -> None:
             conversation = current_conversation()

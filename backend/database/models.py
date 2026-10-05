@@ -214,22 +214,13 @@ class Referral(Base):
         nullable=False
     )
 
-    # X-Verba governance decision that allowed this referral.
-    # Links the database side effect to its VSL ledger evidence.
-    governance_decision_id: Mapped[str | None] = mapped_column(
-        String(36),
-        nullable=True
-    )
 
 
 class ClinicalWorkflowRun(Base):
     """
     Phase 2: one clinical-review workflow run (business process state).
 
-    This records WHERE the business process is. Governance decisions
-    themselves remain in the VSL ledger and are referenced here only by
-    governance_decision_id. Additive table: created by ensure_schema();
-    no existing table is altered.
+    This records clinical-review workflow state and its result snapshot.
     """
 
     __tablename__ = "clinical_workflow_runs"
@@ -277,11 +268,6 @@ class ClinicalWorkflowRun(Base):
         nullable=True
     )
 
-    governance_decision_id: Mapped[str | None] = mapped_column(
-        String(36),
-        nullable=True
-    )
-
     referral_id: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True
@@ -299,7 +285,7 @@ class ClinicalReviewRequestRecord(Base):
     """
     Phase 3: a request for human clinical review (the human review queue).
 
-    Created only through the governed REQUEST_CLINICAL_REVIEW path.
+    Created through the application clinical-review request workflow.
     Additive table: created by ensure_schema(); no existing table altered.
     """
 
@@ -340,10 +326,5 @@ class ClinicalReviewRequestRecord(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
-        nullable=False
-    )
-
-    governance_decision_id: Mapped[str] = mapped_column(
-        String(36),
         nullable=False
     )

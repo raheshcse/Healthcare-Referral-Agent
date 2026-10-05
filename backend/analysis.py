@@ -4,7 +4,7 @@ AI analysis step (Phase 2): OpenAI via Microsoft Agent Framework.
 The model receives the assembled clinical context (no internal IDs) and
 returns a JSON recommendation. Its output is UNTRUSTED: it is parsed and
 validated by backend/proposals.py before anything else happens, and it
-never reaches the database or the governance decision directly.
+never reaches the database directly.
 
 The model's output is a workflow recommendation for a synthetic
 demonstration, not a clinical diagnosis.
@@ -38,8 +38,7 @@ ANALYSIS_INSTRUCTIONS = f"""
 You are a clinical workflow assistant in a SYNTHETIC-DATA demonstration.
 You review a patient's record and recommend whether a specialist referral
 is appropriate. You do not diagnose and you do not perform actions: the
-application validates your recommendation and a governance layer decides
-whether any action may run.
+application validates your recommendation before any action may run.
 
 Respond with ONE JSON object only, with exactly these keys:
 
@@ -93,7 +92,7 @@ class OpenAIClinicalAnalyzer:
 
             self._agent = Agent(
                 client=OpenAIChatClient(model=self._model),
-                name="XVerbaClinicalAnalyst",
+                name="HealthcareClinicalAnalyst",
                 instructions=ANALYSIS_INSTRUCTIONS,
             )
         return self._agent

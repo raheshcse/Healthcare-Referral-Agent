@@ -50,19 +50,14 @@ class WorkflowState(str, Enum):
     DATA_RETRIEVED = "DATA_RETRIEVED"
     ANALYSIS_COMPLETED = "ANALYSIS_COMPLETED"
     ACTION_PROPOSED = "ACTION_PROPOSED"
-    GOVERNANCE_CHECK = "GOVERNANCE_CHECK"
     ACTION_EXECUTED = "ACTION_EXECUTED"
-    REVIEW_REQUIRED = "REVIEW_REQUIRED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    TERMINAL = "TERMINAL"
 
 
 FINAL_STATES = {
     WorkflowState.COMPLETED,
-    WorkflowState.REVIEW_REQUIRED,
     WorkflowState.FAILED,
-    WorkflowState.TERMINAL,
 }
 
 
@@ -75,8 +70,6 @@ class ClinicalWorkflowStatus(str, Enum):
     INVALID_PATIENT_ID = "INVALID_PATIENT_ID"
     ANALYSIS_UNAVAILABLE = "ANALYSIS_UNAVAILABLE"
     INVALID_PROPOSAL = "INVALID_PROPOSAL"
-    GOVERNANCE_DENIED = "GOVERNANCE_DENIED"
-    GOVERNANCE_TERMINAL = "GOVERNANCE_TERMINAL"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -119,7 +112,6 @@ class ClinicalWorkflowResult:
     proposal: dict[str, Any] | None = None
     proposal_errors: list[str] = field(default_factory=list)
     ignored_ai_fields: list[str] = field(default_factory=list)
-    governance: dict[str, Any] | None = None
     referral: dict[str, Any] | None = None
     replayed: bool = False
 
@@ -198,7 +190,7 @@ class ClinicalReviewWorkflow:
 
         # Duplicate-execution prevention: a repeated submission with the
         # same idempotency key returns the recorded outcome and never
-        # re-runs analysis, governance or the side effect.
+        # re-runs analysis or the side effect.
         if key:
             existing = self._store.find_by_idempotency_key(key)
             if existing is not None:
@@ -343,13 +335,8 @@ class ClinicalReviewWorkflow:
         if proposal.action != ACTION_CREATE_REFERRAL:  # exhaustive guard
             raise RuntimeError("Unhandled proposal action.")
 
-        # 6. X-Verba governance -> side effect (existing single path) ----
-        #    The patient ID comes from deterministic resolution, never from
-        #    the AI output.
-        result.enter(WorkflowState.GOVERNANCE_CHECK)
-        # Persist the resolved patient BEFORE governance: the invariant
-        # GOVERNANCE_CONTEXT_MUST_MATCH_PATIENT compares the governed
-        # candidate against this recorded workflow context.
+        # 6. Validated proposal -> referral workflow. The patient ID comes
+        # from deterministic resolution, never from the AI output.
         self._store.save(result.to_dict())
 
         outcome = await self.referral_workflow.run(
@@ -363,32 +350,13 @@ class ClinicalReviewWorkflow:
             )
         )
 
-        if outcome.governance is not None:
-            result.governance = outcome.governance.summary()
-
         if outcome.status is WorkflowStatus.REFERRAL_CREATED and outcome.referral is not None:
             result.referral = outcome.referral.to_dict()
             result.enter(WorkflowState.ACTION_EXECUTED, f"referral {outcome.referral.referral_id}")
             result.finish(
                 WorkflowState.COMPLETED,
                 ClinicalWorkflowStatus.REFERRAL_CREATED,
-                f"Referral {outcome.referral.referral_id} to {outcome.referral.department} was created after governance approval.",
-            )
-            return
-
-        if outcome.status is WorkflowStatus.GOVERNANCE_DENIED:
-            result.finish(
-                WorkflowState.REVIEW_REQUIRED,
-                ClinicalWorkflowStatus.GOVERNANCE_DENIED,
-                "Governance did not approve the proposed referral. It requires human review. No referral was created.",
-            )
-            return
-
-        if outcome.status is WorkflowStatus.GOVERNANCE_TERMINAL:
-            result.finish(
-                WorkflowState.TERMINAL,
-                ClinicalWorkflowStatus.GOVERNANCE_TERMINAL,
-                "Governance halted the automated action (terminal state). No referral was created.",
+                f"Referral {outcome.referral.referral_id} to {outcome.referral.department} was created.",
             )
             return
 

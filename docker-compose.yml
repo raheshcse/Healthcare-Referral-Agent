@@ -3,12 +3,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: xverba-backend
+    container_name: healthcare-referral-backend
     ports:
       - "8000:8000"
     environment:
-      XVERBA_HOST: 0.0.0.0
-      XVERBA_PORT: 8000
+      HEALTHCARE_REFERRAL_HOST: 0.0.0.0
+      HEALTHCARE_REFERRAL_PORT: 8000
       OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env before starting Docker}
       OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4.1-mini}
     volumes:
@@ -18,7 +18,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: xverba-frontend
+    container_name: healthcare-referral-frontend
     ports:
       - "5173:80"
     depends_on:

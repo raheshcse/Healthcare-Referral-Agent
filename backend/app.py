@@ -57,9 +57,9 @@ from backend.tools.patient_tools import get_patient
 from backend.workflow import ReferralWorkflow, get_default_workflow
 
 
-logger = logging.getLogger("xverba.api")
+logger = logging.getLogger("healthcare_referral.api")
 
-SERVICE_NAME = "x-verba-healthcare-referral-agent"
+SERVICE_NAME = "healthcare-referral-agent"
 
 STATUS_CODES: dict[WorkflowStatus, int] = {
     WorkflowStatus.REFERRAL_CREATED: 201,
@@ -67,8 +67,6 @@ STATUS_CODES: dict[WorkflowStatus, int] = {
     WorkflowStatus.PATIENT_NOT_FOUND: 404,
     WorkflowStatus.MULTIPLE_PATIENT_MATCHES: 409,
     WorkflowStatus.INVALID_PATIENT_ID: 422,
-    WorkflowStatus.GOVERNANCE_DENIED: 403,
-    WorkflowStatus.GOVERNANCE_TERMINAL: 403,
     WorkflowStatus.INTERNAL_ERROR: 500,
 }
 
@@ -81,8 +79,6 @@ CLINICAL_STATUS_CODES: dict[str, int] = {
     ClinicalWorkflowStatus.INVALID_PATIENT_ID.value: 422,
     ClinicalWorkflowStatus.ANALYSIS_UNAVAILABLE.value: 503,
     ClinicalWorkflowStatus.INVALID_PROPOSAL.value: 502,
-    ClinicalWorkflowStatus.GOVERNANCE_DENIED.value: 403,
-    ClinicalWorkflowStatus.GOVERNANCE_TERMINAL.value: 403,
     ClinicalWorkflowStatus.INTERNAL_ERROR.value: 500,
 }
 
@@ -112,7 +108,7 @@ app.add_middleware(
     allow_origins=[
         origin.strip()
         for origin in os.environ.get(
-            "XVERBA_CORS_ORIGINS",
+            "HEALTHCARE_REFERRAL_CORS_ORIGINS",
             "http://localhost:5173,http://127.0.0.1:5173",
         ).split(",")
         if origin.strip()
@@ -258,9 +254,8 @@ async def chat(
     response_model=ReferralResponse,
     status_code=201,
     tags=["referrals"],
-    summary="Create a governed referral",
+    summary="Create a referral",
     responses={
-        403: {"model": ReferralResponse, "description": "Blocked by X-Verba governance (DENY / TERMINAL)"},
         404: {"model": ReferralResponse, "description": "PATIENT_NOT_FOUND"},
         409: {"model": ReferralResponse, "description": "MULTIPLE_PATIENT_MATCHES"},
         422: {"model": ReferralResponse, "description": "INVALID_REQUEST / INVALID_PATIENT_ID"},
@@ -294,10 +289,9 @@ async def create_referral(
     response_model=ClinicalWorkflowResponse,
     status_code=201,
     tags=["clinical workflows"],
-    summary="Run a governed clinical review for a patient",
+    summary="Run a clinical review for a patient",
     responses={
         200: {"model": ClinicalWorkflowResponse, "description": "NO_ACTION_RECOMMENDED"},
-        403: {"model": ClinicalWorkflowResponse, "description": "GOVERNANCE_DENIED (REVIEW_REQUIRED) / GOVERNANCE_TERMINAL"},
         404: {"model": ClinicalWorkflowResponse, "description": "PATIENT_NOT_FOUND"},
         409: {"model": ClinicalWorkflowResponse, "description": "MULTIPLE_PATIENT_MATCHES"},
         422: {"model": ClinicalWorkflowResponse, "description": "INVALID_REQUEST / INVALID_PATIENT_ID"},
@@ -392,7 +386,6 @@ async def list_clinical_review_requests(
                 "reason": r.reason,
                 "status": r.status,
                 "created_at": r.created_at.isoformat(),
-                "governance_decision_id": r.governance_decision_id,
             }
             for r in rows
         ],
@@ -448,4 +441,3 @@ async def get_patient_information(
         return _error(404, WorkflowStatus.PATIENT_NOT_FOUND.value, "Patient not found.")
 
     return PatientDetailResponse.model_validate(details)
-

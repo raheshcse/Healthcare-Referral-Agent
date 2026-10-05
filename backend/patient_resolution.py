@@ -356,3 +356,14 @@ def resolve_patient_by_name(
         message="Exactly one patient matched.",
         patient=patient,
     )
+
+
+def resolve_patient_by_id(session: Session, patient_id: object) -> PatientResolution:
+    """Resolve a canonical internal identifier and confirm the patient exists."""
+    normalized = normalize_patient_id(patient_id)
+    if normalized is None:
+        return PatientResolution(ResolutionStatus.INVALID_PATIENT_ID, "The patient identifier is not valid.")
+    patient = session.get(Patient, normalized)
+    if patient is None:
+        return PatientResolution(ResolutionStatus.NOT_FOUND, "No patient matches that identifier.")
+    return PatientResolution(ResolutionStatus.RESOLVED, "Patient resolved.", patient=_to_record(patient))

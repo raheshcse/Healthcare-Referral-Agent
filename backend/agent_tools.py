@@ -8,8 +8,8 @@ Design rule: the LLM never handles internal patient identifiers.
     understand the request      resolve the patient deterministically
     extract patient name        obtain the internal patient UUID
     extract department          build the referral candidate
-    extract reason              run X-Verba VSL governance
-    call create_referral        perform the database write on ALLOW
+    extract reason              validate the request
+    call create_referral        perform the database write
 
 Tool results returned to the model therefore contain names, dates of
 birth and outcomes - never patient UUIDs - so the model has nothing to
@@ -52,7 +52,7 @@ from backend.workflow import (
 # ============================================================
 
 _captured_outcomes: ContextVar[list[ReferralOutcome] | None] = ContextVar(
-    "xverba_captured_referral_outcomes",
+    "captured_referral_outcomes",
     default=None,
 )
 
@@ -80,7 +80,7 @@ def _record(outcome: ReferralOutcome) -> None:
 
 
 _captured_reviews: ContextVar[list[ClinicalWorkflowResult] | None] = ContextVar(
-    "xverba_captured_clinical_reviews",
+    "captured_clinical_reviews",
     default=None,
 )
 
@@ -144,7 +144,6 @@ def _review_for_model(result: ClinicalWorkflowResult) -> dict[str, Any]:
         "proposed_action": proposal.get("action"),
         "department": proposal.get("department"),
         "referral_id": (result.referral or {}).get("referral_id"),
-        "governance_decision": (result.governance or {}).get("decision"),
         "candidates": [
             {"name": c.get("name"), "date_of_birth": c.get("date_of_birth")}
             for c in result.candidates
@@ -199,19 +198,16 @@ def _outcome_for_model(outcome: ReferralOutcome) -> dict[str, Any]:
         "patient_name": outcome.patient.name if outcome.patient else None,
         "department": outcome.referral.department if outcome.referral else None,
         "referral_id": outcome.referral.referral_id if outcome.referral else None,
-        "governance_decision": (
-            outcome.governance.outcome.value if outcome.governance else None
-        ),
         "candidates": [_public_patient(c) for c in outcome.candidates],
     }
 
 
 # ============================================================
-# Phase 3: governed-action outcomes and conversation state
+# Phase 3: action outcomes and conversation state
 # ============================================================
 
 _captured_actions: ContextVar[list[ActionOutcome] | None] = ContextVar(
-    "xverba_captured_action_outcomes",
+    "captured_action_outcomes",
     default=None,
 )
 
@@ -235,7 +231,7 @@ def _record_action(outcome: ActionOutcome) -> None:
 
 
 def _action_for_model(outcome: ActionOutcome) -> dict[str, Any]:
-    """LLM-facing view of a governed action. Contains no patient UUID."""
+    """LLM-facing view of an action. Contains no patient UUID."""
 
     return {
         "success": outcome.success,
@@ -244,7 +240,6 @@ def _action_for_model(outcome: ActionOutcome) -> dict[str, Any]:
         "referral_id": outcome.referral.referral_id if outcome.referral else None,
         "referral_status": outcome.referral.status if outcome.referral else None,
         "review_request_id": outcome.review_request.review_request_id if outcome.review_request else None,
-        "governance_decision": outcome.governance.outcome.value if outcome.governance else None,
         "candidates": [_public_patient(c) for c in outcome.candidates],
     }
 
@@ -478,7 +473,7 @@ def get_patient_encounters(
 
 
 # ============================================================
-# Tools: governed side effects
+# Tools: side effects
 # ============================================================
 
 @tool(approval_mode="never_require")
@@ -499,11 +494,10 @@ async def create_referral(
     date_of_birth: Annotated[str, _DOB_DOC] = "",
 ) -> dict:
     """
-    Create a healthcare referral (governed side effect).
+    Create a healthcare referral.
 
     Call ONCE when the staff member has asked for a referral and the
-    patient, department and reason are all known. X-Verba governance
-    decides whether it is created. Report the returned message exactly.
+    patient, department and reason are all known. Report the returned message exactly.
     """
 
     patient_name = _resolve_reference(patient_name)
@@ -553,8 +547,8 @@ async def update_referral(
     date_of_birth: Annotated[str, _DOB_DOC] = "",
 ) -> dict:
     """
-    Change the department and/or reason of an existing ACTIVE referral
-    (governed side effect). Only when the staff member asks to change a
+    Change the department and/or reason of an existing ACTIVE referral.
+    Only when the staff member asks to change a
     specific referral.
     """
 
@@ -581,7 +575,7 @@ async def cancel_referral(
     date_of_birth: Annotated[str, _DOB_DOC] = "",
 ) -> dict:
     """
-    Cancel an existing ACTIVE referral (governed side effect). Only when the
+    Cancel an existing ACTIVE referral. Only when the
     staff member explicitly asks to cancel a specific referral.
     """
 
@@ -608,8 +602,7 @@ async def request_clinical_review(
     date_of_birth: Annotated[str, _DOB_DOC] = "",
 ) -> dict:
     """
-    Ask a human clinician to review a patient or referral (governed side
-    effect: opens a clinical review request). Use when the staff member asks
+    Ask a human clinician to review a patient or referral. Use when the staff member asks
     for a clinician's review, e.g. after a referral was blocked.
     """
 
@@ -650,7 +643,7 @@ async def review_patient_for_referral(
     Use this when the staff member asks you to REVIEW a patient or asks
     WHETHER a referral is appropriate. The application retrieves the
     record, runs the clinical analysis and, if a referral is proposed,
-    submits it to X-Verba governance. Report the returned message exactly.
+    validates and creates it. Report the returned message exactly.
     Do NOT call create_referral afterwards for the same request.
     """
 

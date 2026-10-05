@@ -11,8 +11,8 @@ blindly:
 - malformed output produces errors and no proposal.
 
 Validation here checks SHAPE. Whether the action may run is decided by
-X-Verba governance afterwards (e.g. AI_PROPOSAL_GROUNDED checks that
-the cited evidence exists in the patient's record).
+application validation afterwards (e.g. checking that the cited
+evidence exists in the patient's record).
 """
 
 from __future__ import annotations

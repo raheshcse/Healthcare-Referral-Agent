@@ -2,8 +2,7 @@
 Persistence for clinical-review workflow runs (business process state).
 
 Stores a JSON snapshot of each run in ``clinical_workflow_runs`` plus a
-few indexed columns for listing. Governance evidence is NOT stored here;
-it stays in the VSL ledger and is referenced by governance_decision_id.
+few indexed columns for listing.
 """
 
 from __future__ import annotations
@@ -58,7 +57,6 @@ class ClinicalRunStore:
             run.updated_at = datetime.utcnow()
             run.state = snapshot["state"]
             run.status = snapshot.get("status")
-            run.governance_decision_id = (snapshot.get("governance") or {}).get("decision_id")
             run.referral_id = (snapshot.get("referral") or {}).get("referral_id")
             run.result_json = json.dumps(snapshot, default=str)
             session.commit()
@@ -90,7 +88,6 @@ class ClinicalRunStore:
                     "status": run.status,
                     "patient_name": run.requested_patient_name,
                     "department": run.requested_department,
-                    "governance_decision_id": run.governance_decision_id,
                     "referral_id": run.referral_id,
                 }
                 for run in runs

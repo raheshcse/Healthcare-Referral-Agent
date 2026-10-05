@@ -169,7 +169,7 @@ export default function ClinicianApp() {
             <Stethoscope size={22} />
           </div>
           <div>
-            <div className="clin-brand-name">X-Verba Healthcare Referral Agent</div>
+            <div className="clin-brand-name">Healthcare Referral Agent</div>
             <div className="clin-brand-sub">Healthcare Referral Assistant</div>
           </div>
         </div>

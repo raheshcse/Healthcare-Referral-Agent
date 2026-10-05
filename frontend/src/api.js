@@ -79,13 +79,7 @@ export const sendChatMessage = (message, conversationId = null) =>
     timeout: CHAT_TIMEOUT_MS,
   });
 
-export const listGovernanceDecisions = (limit = 25) =>
-  request({ method: "get", url: "/governance", params: { limit } });
-
-export const getGovernanceDecision = (decisionId) =>
-  requestWithBody({ method: "get", url: `/governance/${encodeURIComponent(decisionId)}` });
-
-// Phase 2: governed clinical review workflow. Non-2xx responses still carry
+// Clinical review workflow. Non-2xx responses still carry
 // the structured workflow result (e.g. 403 REVIEW_REQUIRED), so the body
 // is returned together with the HTTP status.
 export const runClinicalReview = (body) =>

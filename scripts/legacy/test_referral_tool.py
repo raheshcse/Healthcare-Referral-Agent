@@ -2,7 +2,7 @@
 Call the agent-facing create_referral tool directly (no LLM).
 
 The tool takes a patient NAME; the application resolves the internal
-patient UUID deterministically and runs X-Verba governance.
+patient UUID deterministically and runs application validation.
 """
 
 import asyncio

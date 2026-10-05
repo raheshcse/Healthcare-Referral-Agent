@@ -1,5 +1,5 @@
 {
-  "name": "x-verba-healthcare-referral-frontend",
+  "name": "healthcare-referral-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test src/lib/outcomes.test.js src/lib/ledger.test.js",
+    "test": "node --test src/lib/outcomes.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

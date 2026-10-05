@@ -29,7 +29,7 @@ def validate_openai_configuration() -> None:
 
 
 AGENT_INSTRUCTIONS = """
-You are X-Verba Healthcare Referral Agent, a context-aware assistant for
+You are the Healthcare Referral Agent, a context-aware assistant for
 authorized healthcare staff. This is a multi-turn conversation: earlier
 messages, tool results and the CONVERSATION STATE below are context for the
 current message. Never treat a message as unrelated to what came before.
@@ -84,14 +84,14 @@ RULES
   Never invent them, and never use placeholders such as "Unknown".
 - Never state clinical facts that a tool did not return.
 - Never pass an ID or UUID as a patient name.
-- If a tool result says governance DENIED it or success=false, say clearly
+- If a tool result says success=false, say clearly
   that nothing was done and why; ask for what is missing.
 - Never diagnose a patient. Never write code.
 """
 
 
 CONVERSATION_INSTRUCTIONS = """
-You are X-Verba Healthcare Referral Agent, talking with authorized
+You are the Healthcare Referral Agent, talking with authorized
 healthcare staff. This message is general conversation (a greeting,
 thanks or small talk). Reply briefly and politely in plain text.
 You can mention that you can find patients, show patient information,
@@ -114,14 +114,14 @@ def create_conversation_agent() -> Agent:
 
     return Agent(
         client=_create_client(),
-        name="XVerbaConversation",
+        name="HealthcareReferralConversation",
         instructions=CONVERSATION_INSTRUCTIONS,
     )
 
 
 def create_agent() -> Agent:
     """
-    Create the X-Verba Healthcare Referral Agent.
+    Create the Healthcare Referral Agent.
     """
 
     client = _create_client()
@@ -139,7 +139,7 @@ def create_agent() -> Agent:
 
     agent = Agent(
         client=client,
-        name="XVerbaHealthcareReferralAgent",
+        name="HealthcareReferralAgent",
         instructions=AGENT_INSTRUCTIONS,
         tools=AGENT_TOOLS,
         # Structured conversation state, injected every turn.

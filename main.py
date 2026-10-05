@@ -1,5 +1,5 @@
 """
-Entry point for the X-Verba Healthcare Referral Agent API.
+Entry point for the Healthcare Referral Agent API.
 
     uvicorn main:app --reload
     python main.py
@@ -17,6 +17,6 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host=os.environ.get("XVERBA_HOST", "127.0.0.1"),
-        port=int(os.environ.get("XVERBA_PORT", "8000")),
+        host=os.environ.get("HEALTHCARE_REFERRAL_HOST", "127.0.0.1"),
+        port=int(os.environ.get("HEALTHCARE_REFERRAL_PORT", "8000")),
     )
