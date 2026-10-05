@@ -1,8 +1,8 @@
 # Healthcare Referral Agent
 
 <p align="center">
-  <strong>Governed AI for Consequential Healthcare Workflows</strong><br/>
-  <sub>Microsoft Agent Framework · OpenAI API ·   · FastAPI · SQLite · React · Synthea</sub>
+  <strong>AI-Assisted Healthcare Referral Workflow</strong><br/>
+  <sub>Microsoft Agent Framework · OpenAI API · FastAPI · SQLite · React · Synthea</sub>
 </p>
 
 <p align="center">
@@ -10,15 +10,14 @@
 ![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python&logoColor=white)
 ![Microsoft Agent Framework](https://img.shields.io/badge/Microsoft%20Agent%20Framework-Agent%20Orchestration-5C2D91)
 ![OpenAI](https://img.shields.io/badge/OpenAI-API-412991)
-![ ](https://img.shields.io/badge/X--Verba-%20Governance-0B8F55)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-Data%20Layer-003B57?logo=sqlite&logoColor=white)
+![React](https://img.shields.io/badge/React-Frontend-61DAFB?logo=react&logoColor=black)
 ![Synthea](https://img.shields.io/badge/Synthea-Synthetic%20Data-F59E0B)
 
 </p>
 
-> **Demonstration build (Phases 1–3).** A governed referral assistant for clinical staff, running entirely locally on **synthetic Synthea patient data**. It is not a clinical system: no real patient data, no diagnosis, and not for patient care.
-
+> **Demonstration build (Phases 1–3).** An AI-assisted referral application for clinical staff, running locally on **synthetic Synthea patient data**. It is not a clinical system: it does not use real patient data, provide diagnosis, or replace professional clinical judgement.
 
 ---
 
@@ -28,54 +27,72 @@
 2. [What the product does](#what-the-product-does)
 3. [Architecture](#architecture)
 4. [Conversation and tool flow](#conversation-and-tool-flow)
-6. [Clinical review workflow (AI proposals)](#clinical-review-workflow-ai-proposals)
-7. [User interfaces](#user-interfaces)
-8. [API](#api)
-9. [Governance scenarios tested](#governance-scenarios-tested)
-11. [Setup and running locally](#setup-and-running-locally)
-12. [Client demo guide](#client-demo-guide)
-13. [Testing](#testing)
-14. [Project structure](#project-structure)
-15. [Design principles](#design-principles)
-16. [Known limitations](#known-limitations)
-17. [Real-world applicability](#real-world-applicability)
-18. [Roadmap](#roadmap)
+5. [Clinical review workflow](#clinical-review-workflow)
+6. [User interfaces](#user-interfaces)
+7. [API](#api)
+8. [Referral and workflow rules](#referral-and-workflow-rules)
+9. [Evidence and testing scenarios](#evidence-and-testing-scenarios)
+10. [Setup and running locally](#setup-and-running-locally)
+11. [Client demo guide](#client-demo-guide)
+12. [Testing](#testing)
+13. [Project structure](#project-structure)
+14. [Design principles](#design-principles)
+15. [Known limitations](#known-limitations)
+16. [Real-world applicability](#real-world-applicability)
+17. [Roadmap](#roadmap)
+18. [Disclaimer](#disclaimer)
 
 ---
 
 ## Executive summary
 
-The **Healthcare Referral Agent** shows a practical architecture for AI agents in workflows where an AI-initiated action changes system state, here creating, updating or cancelling a patient referral.
+The **Healthcare Referral Agent** demonstrates a practical AI-assisted workflow for healthcare referral administration.
 
-Clinical staff talk to the assistant in natural language. The configured **OpenAI** model, running through **Microsoft Agent Framework (MAF)**, interprets the request and chooses tools. ** ** governance then decides, before anything happens, whether each tool call and each consequential action is allowed. Every decision is written to an append-only, hash-chained ledger.
+Clinical staff interact with the application using natural language. **Microsoft Agent Framework (MAF)** manages the agent loop and tool invocation, while an **OpenAI** model interprets requests, selects tools, and produces conversational responses.
+
+The application layer provides deterministic patient resolution, conversation state, validation, clinical-data retrieval, referral workflows, and controlled database writes. The model is treated as an assistant rather than as the source of truth for patient identity or database state.
 
 ```text
-AI interprets intent
-        ↓
- governs the model's tool call          (pre-tool governance)
-        ↓
-Application deterministically prepares the action
-        ↓
- governs the action itself               (action governance)
-        ↓
-Only ALLOW reaches the side effect  →  ledger evidence for every decision
+Clinical staff
+      ↓
+React frontend
+      ↓
+FastAPI backend
+      ↓
+Microsoft Agent Framework + OpenAI
+      ↓
+Conversation / tool routing
+      ↓
+Deterministic application workflows
+      ↓
+Patient resolution + input validation
+      ↓
+Referral / clinical workflow
+      ↓
+SQLite database
 ```
 
-> **Reasoning is not execution authority.** The model can propose; the governed system decides.
+The central design principle is:
+
+> **The AI can interpret a request and propose an action, but the application remains responsible for validating the request and performing the actual database operation.**
 
 ---
 
 ## What the product does
 
-| Capability | How |
+| Capability | Description |
 |---|---|
-| Multi-turn referral assistant | Remembers the patient, department and reason across turns, asks only for what is missing, and resolves "she/her" to the patient being discussed |
-| Explicit confirmation | A referral built up over several messages is submitted only after "yes, go ahead". "No", "cancel" or "never mind" withdraws it |
-| Patient lookup and clinical data | Read-only tools for the patient summary, conditions, medications, allergies, observations and encounters |
-| Governed referral actions | Create, update and cancel referrals, and request a human clinical review |
-| AI clinical review (decision support) | The configured OpenAI model reviews the record and may propose a referral, which is then validated and governed |
-| Review Console | A separate `/engineering` view of every decision, with its ledger entries, causal links and hash-chain integrity |
-| Fail-closed behaviour | Unknown, ambiguous or invented inputs, governance errors and tool failures never produce a write or a success message |
+| Multi-turn referral assistant | Collects patient, department and referral reason across several messages |
+| Explicit confirmation | Multi-turn referral requests can require an explicit confirmation before submission |
+| Patient lookup | Finds synthetic patients using deterministic name matching |
+| Clinical data access | Retrieves patient information, conditions, medications, allergies, observations and encounters |
+| Referral creation | Creates a referral after the application validates the request |
+| Referral updates | Updates an existing referral when the request contains the required information |
+| Referral cancellation | Cancels an existing referral with a supplied cancellation reason |
+| Clinical review request | Allows a clinical review request to be created |
+| AI clinical review | Uses the configured OpenAI model to review bounded patient information and produce a structured proposal |
+| Fail-closed application behaviour | Ambiguous patients, invalid inputs and failed operations do not silently create records |
+| Synthetic healthcare data | Uses Synthea-generated data for development and demonstration |
 
 ---
 
@@ -83,50 +100,69 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 
 ```text
 ┌──────────────────────────────────────────────────────────────────┐
-│                     AUTHORISED CLINICAL STAFF                    │
+│                     CLINICAL STAFF                               │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ React frontend   Clinician app /   ·   Review console /engineering│
+│ React Frontend                                                   │
+│   • Clinician application                                        │
+│   • Patient review                                               │
+│   • Referral workflows                                           │
+│   • Application monitoring / review views                        │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ FastAPI (backend/app.py)                                         │
-│   /chat → ChatService                                            │
-│   conversation state + deterministic patient / referral capture  │
+│ FastAPI Backend                                                  │
+│   /chat                                                          │
+│   /patients                                                      │
+│   /referrals                                                     │
+│   /clinical workflows                                            │
+│   /health                                                        │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ Microsoft Agent Framework · OpenAI API · gpt-4.1-mini             │
-│   one AgentSession per conversation · 12 tools                   │
+│ Microsoft Agent Framework + OpenAI                               │
+│   • Agent session                                                │
+│   • Natural-language understanding                               │
+│   • Tool selection                                               │
+│   • Conversation history                                         │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ TOOL VALIDATION                                                   │
-│   proposed tool calls are checked before execution                │
-│   invalid requests are blocked before the tool runs              │
+│ Application Workflows                                            │
+│   • Conversation state                                           │
+│   • Deterministic patient resolution                             │
+│   • Input validation                                             │
+│   • Clinical data retrieval                                      │
+│   • Referral workflow                                            │
+│   • Clinical review workflow                                     │
 └───────────────────────────────┬──────────────────────────────────┘
                                 ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│ DETERMINISTIC WORKFLOWS                                          │
-│   patient resolution → candidate → AI proposal validation         │
-└───────────────────────────────┬──────────────────────────────────┘
-                                ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ APPLICATION ACTIONS (backend/actions.py)                         │
-│   validated actions → SQLite                                     │
+│ SQLite Database                                                  │
+│   • Patients                                                     │
+│   • Conditions                                                   │
+│   • Medications                                                  │
+│   • Allergies                                                    │
+│   • Observations                                                 │
+│   • Encounters                                                   │
+│   • Referrals                                                    │
+│   • Clinical workflow runs                                       │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+### Separation of responsibilities
+
 | Layer | Responsibility |
 |---|---|
-| **OpenAI / gpt-4.1-mini** | Understanding language, choosing tools and writing replies |
-| **Microsoft Agent Framework** | Agent loop, tool invocation, session history and middleware |
-| **Conversation layer** | Structured referral state, deterministic slot filling, confirmation and pronoun resolution |
-| **Application workflows** | Deterministic patient resolution, candidate construction and AI-output validation |
-| **Tool validation** | Prevents invalid or unsupported tool requests from executing |
-| **`backend/actions.py`** | Controlled writer for referrals and review requests |
-| **SQLite + Synthea** | Synthetic patient records and referral persistence |
+| **OpenAI model** | Natural-language understanding, tool selection and response generation |
+| **Microsoft Agent Framework** | Agent loop, tool invocation and conversation session |
+| **Conversation layer** | Multi-turn state, slot collection, confirmation and patient context |
+| **Application workflows** | Deterministic orchestration, validation and business rules |
+| **Patient resolution** | Converts user-supplied patient information into one database record without guessing |
+| **Actions layer** | Performs controlled database writes |
+| **SQLite + Synthea** | Synthetic patient data and application persistence |
+| **React** | Clinician-facing application interface |
 
 ---
 
@@ -134,290 +170,744 @@ Only ALLOW reaches the side effect  →  ledger evidence for every decision
 
 ### Conversation state
 
-- `POST /chat` takes an optional `conversation_id`. If it is omitted, a new conversation starts; the response returns the id together with a clinician-safe `context` (patient name, department, reason, what is still missing, stage). The UI keeps the id and offers **New conversation**.
-- Each conversation has one MAF `AgentSession`, so the configured OpenAI model sees the earlier turns. `ReferralContext` (`backend/conversation.py`) holds the validated facts: patient, department, reason and stage `IDLE → COLLECTING → READY → CONFIRMED → SUBMITTED`. These facts are injected into the model's instructions on every turn.
-- Clearly supplied answers ("Aisha Wiegand.", "Cardiology.", "She has chest pain.") are captured deterministically, and the next missing item is asked for without calling the model. Known facts are never asked for again, and a reason is never invented.
-- Department aliases are understood ("haematology", "ENT", "cardiac clinic"). An unsupported department ("XYZ") is answered with the list of supported departments.
-- **Confirmation:**
-  - A single complete instruction ("Refer Aisha Wiegand to cardiology because of chest pain") counts as confirmed.
-  - Details collected over several turns need an explicit "yes".
-  - "No", "cancel" or "never mind" withdraws the referral.
-  - Changing the department ("actually, make it neurology") requires confirmation again.
-- **Structured patient identification:** patient identity is held as separate fields: `patient_name`, `date_of_birth` and (after deterministic resolution) `patient_id`. They are never concatenated.
-  - "show me patient information for Ram", where several patients match, gets a clear list of candidates by name and date of birth.
-  - The reply "Ram Kumar, 02/10/2003" is understood as the answer. It resolves the patient, and the original request continues with clean, separate tool arguments.
-  - Dates are read day-first (NZ): 02/10/2003 is 2 October 2003. Impossible dates are rejected with a "DD/MM/YYYY" hint.
-  - A date of birth is used only if the clinician typed it, so the model cannot narrow a search with an invented date.
-  - Not-found patients and tool errors get clear, fixed replies.
-- **Patient context:**
-  - Every new referral request starts with a clean department and reason.
-  - The previous patient is kept only for back-references ("refer **her** to neurology too").
-  - A new name that cannot be resolved never inherits the previous patient.
-- Greetings and small talk use a tool-less agent that shares the same history.
-- Conversations are held in memory (2-hour TTL, at most 500).
+`POST /chat` accepts an optional `conversation_id`.
 
-### Agent tools
+If no conversation exists, the application starts a new conversation. The frontend keeps the conversation identifier and uses it for subsequent messages.
 
-| Tool | Kind | Pre-tool PreNodes |
-|---|---|---|
-| `search_patient(name)` | read-only | `PATIENT_SEARCH_REQUEST_VALID` |
-| `get_patient_information(patient_name, date_of_birth)` | read-only summary | `CLINICAL_DATA_ACCESS_VALID` |
-| `get_patient_conditions`, `_medications`, `_allergies`, `_observations`, `_encounters` | read-only, one category (≤ 25 items) | `CLINICAL_DATA_ACCESS_VALID` |
-| `review_patient_for_referral(patient_name, department)` | AI clinical review workflow | `CLINICAL_DATA_ACCESS_VALID` |
-| `create_referral(patient_name, department, reason)` | governed side effect | `REFERRAL_INTENT_COMPLETE`, `ACTION_INPUT_GROUNDED`, `REFERRAL_CONFIRMED_BY_STAFF` |
-| `update_referral(referral_number, patient_name, department, reason)` | governed side effect | `ACTION_INPUT_GROUNDED` |
-| `cancel_referral(referral_number, patient_name, cancellation_reason)` | governed side effect | `ACTION_INPUT_GROUNDED` |
-| `request_clinical_review(patient_name, reason, department, referral_number)` | governed side effect | `ACTION_INPUT_GROUNDED` |
+The referral conversation follows a simple state model:
 
-Every patient tool also takes an optional, separate `date_of_birth` (only when the clinician gave one). Tools take patient **names**, never IDs. Resolution to an internal UUID is deterministic (`backend/patient_resolution.py`): exactly one match continues, and no match or several matches stop without guessing. Tool results never contain patient UUIDs.
+```text
+IDLE
+  ↓
+COLLECTING
+  ↓
+READY
+  ↓
+CONFIRMED
+  ↓
+SUBMITTED
+```
 
-### Replies come from outcomes, not from the model
+The application tracks validated facts such as:
 
-When a governed workflow runs, the clinician's reply is built from its actual outcome. When a side-effecting tool was attempted but produced no outcome (denied before it ran, or failed), the reply is fixed text, for example *"No referral or change was made. Please confirm the patient, department and reason before I submit the referral."* The model's own wording can never claim a result that did not happen. Denials given to the model contain guidance only; internal rule names stay in the ledger.
+- patient name
+- date of birth, when supplied
+- department
+- referral reason
+- conversation stage
+
+### Multi-turn example
+
+```text
+Clinician:
+I want to refer a patient.
+
+Assistant:
+Sure. Which patient?
+
+Clinician:
+Aisha Wiegand.
+
+Assistant:
+Which department should receive the referral?
+
+Clinician:
+Cardiology.
+
+Assistant:
+What is the reason?
+
+Clinician:
+She has been experiencing chest pain.
+
+Assistant:
+Please confirm the referral to Cardiology for Aisha Wiegand
+because of chest pain.
+
+Clinician:
+Yes, go ahead.
+
+Assistant:
+The referral has been created.
+```
+
+The application does not invent a missing reason or silently choose an ambiguous patient.
+
+### Confirmation behaviour
+
+- A complete instruction can be submitted directly.
+- A referral collected across several turns can require explicit confirmation.
+- `yes`, `go ahead`, and similar confirmations continue the workflow.
+- `no`, `cancel`, or `never mind` withdraws the pending request.
+- Changing important referral details can require confirmation again.
+
+### Structured patient identification
+
+Patient identity is kept as separate fields:
+
+```text
+patient_name
+date_of_birth
+patient_id
+```
+
+The model does not choose the internal database identifier.
+
+Patient resolution is handled by `backend/patient_resolution.py`:
+
+- zero matches → patient not found
+- one match → workflow continues
+- multiple matches → user must clarify
+- the workflow never arbitrarily chooses one patient
+
+For example:
+
+```text
+"Ram Kumar, 02/10/2003"
+```
+
+is treated as a patient name plus date of birth rather than as one combined value.
+
+Dates are interpreted day-first for the application demonstration.
 
 ---
 
-## Clinical review workflow (AI proposals)
+## Agent tools
 
-*"Review Aisha Wiegand and determine whether a cardiology referral is appropriate."*
+The application exposes tools for patient lookup, clinical data access, referral operations and clinical review.
+
+| Tool | Purpose | Type |
+|---|---|---|
+| `search_patient(name)` | Search for a patient by name | Read-only |
+| `get_patient_information(patient_name, date_of_birth)` | Retrieve a patient summary | Read-only |
+| `get_patient_conditions(...)` | Retrieve conditions | Read-only |
+| `get_patient_medications(...)` | Retrieve medications | Read-only |
+| `get_patient_allergies(...)` | Retrieve allergies | Read-only |
+| `get_patient_observations(...)` | Retrieve observations | Read-only |
+| `get_patient_encounters(...)` | Retrieve encounters | Read-only |
+| `review_patient_for_referral(patient_name, department)` | Run the clinical review workflow | Workflow |
+| `create_referral(patient_name, department, reason)` | Create a referral | Write |
+| `update_referral(referral_number, patient_name, department, reason)` | Update a referral | Write |
+| `cancel_referral(referral_number, patient_name, cancellation_reason)` | Cancel a referral | Write |
+| `request_clinical_review(...)` | Create a clinical review request | Write |
+
+The tools accept patient names rather than internal patient IDs. Internal identifiers are resolved by the application.
+
+---
+
+## Clinical review workflow
+
+The clinical review workflow separates AI analysis from database execution.
 
 ```text
-Patient resolution (deterministic) → clinical record (Synthea) → bounded context (no IDs)
-   → OpenAI analysis (JSON, UNTRUSTED) → validated ActionProposal (backend/proposals.py)
-   →  action governance (origin = AI_PROPOSAL) → ALLOW: referral written · DENY: REVIEW_REQUIRED · TERMINAL
+Patient request
+      ↓
+Patient resolution
+      ↓
+Retrieve bounded clinical context
+      ↓
+OpenAI analysis
+      ↓
+Structured proposal
+      ↓
+Application validation
+      ↓
+Referral / no-action decision
+      ↓
+Database action when appropriate
 ```
 
-- **Proposal validation.** Only `CREATE_REFERRAL` or `NO_ACTION` and only supported departments are accepted. A department the clinician named cannot be changed by the AI. Any `patient_id`, `uuid` or `referral_id` the AI supplies is ignored and recorded. Text containing a UUID is rejected. Malformed output becomes `INVALID_PROPOSAL`, and governance is never called.
-- **Workflow states.** `REQUESTED → PATIENT_RESOLVED → DATA_RETRIEVED → ANALYSIS_COMPLETED → ACTION_PROPOSED → GOVERNANCE_CHECK → ACTION_EXECUTED → COMPLETED`, ending in `REVIEW_REQUIRED`, `TERMINAL` or `FAILED` on the failure paths. Runs are stored in `clinical_workflow_runs`.
-- **Idempotency.** `POST /clinical-workflows` accepts an `idempotency_key`; a repeated key returns the recorded run without running again.
-- **Decision support only.** The UI labels the AI recommendation *"decision support only, not a diagnosis"*. If governance allows the proposal, the review creates the referral it proposed. This is the Phase 2 design, and it is still governed by every rule above.
+The workflow records its execution in the `clinical_workflow_runs` table.
 
-| Final state | `status` (HTTP) |
-|---|---|
-| `COMPLETED` | `REFERRAL_CREATED` (201), `NO_ACTION_RECOMMENDED` (200) |
-| `REVIEW_REQUIRED` | `GOVERNANCE_DENIED` (403) |
-| `TERMINAL` | `GOVERNANCE_TERMINAL` (403) |
-| `FAILED` | `PATIENT_NOT_FOUND` 404 · `MULTIPLE_PATIENT_MATCHES` 409 · `INVALID_REQUEST` / `INVALID_PATIENT_ID` 422 · `INVALID_PROPOSAL` 502 · `ANALYSIS_UNAVAILABLE` 503 · `INTERNAL_ERROR` 500 |
+### AI output is treated as untrusted input
+
+The model can produce a recommendation, but the application validates the returned structure before using it.
+
+The workflow checks items such as:
+
+- patient identity
+- department
+- recommendation type
+- reason
+- evidence supplied by the model
+- whether referenced clinical evidence exists in the patient's record
+
+The application does not treat arbitrary model text as a database command.
+
+### Example
+
+```text
+Clinician:
+Review Aisha Wiegand's clinical information.
+
+→ Patient is resolved.
+→ Clinical information is retrieved.
+→ AI analysis is performed.
+→ A clinical review result is returned.
+→ No referral is created unless the workflow explicitly produces
+  a valid referral action.
+```
+
+A clinical review request and a referral creation request are treated as different application intents.
 
 ---
 
 ## User interfaces
 
-The React/Vite frontend (`frontend/`) has two **separate** surfaces. Both talk only to FastAPI, through `src/api.js`, and contain no governance logic.
+### Clinician application
 
-### Clinician app: `/`
+The main application provides:
 
-- **Assistant tab**: multi-turn chat, with **New conversation**.
-- **Patient review tab**: runs the AI clinical review directly (patient plus optional department).
-- **Current conversation**: what has been established (patient, department, reason), what is still needed, and whether it is awaiting confirmation.
-- **Request status**: *Request received → Patient identified → Safety & governance checks → Referral / Change recorded*, driven by the backend's real outcome.
-- **Referral result** and **This session**: outcome cards for referrals, updates, cancellations and review requests.
+- AI chat
+- patient lookup
+- clinical information
+- referral creation
+- referral updates
+- referral cancellation
+- clinical review
+- workflow status
+- conversation context
 
-What the clinician sees is derived from backend **status codes** (`src/lib/outcomes.js`, unit tested). HTTP 200 alone is never treated as success, and the clinician view never shows patient UUIDs, decision IDs, hashes,  rule names or stack traces. Blocked outcomes use plain language, for example *"Duplicate referral blocked"*, *"Department not supported"* or *"The referral was blocked by the governance workflow."*
+### Patient review
 
-### Review Console: `/engineering`
+The patient review workflow allows staff to:
 
-For developers and reviewers:
+1. select a patient
+2. select a referral department
+3. request an AI-assisted clinical review
+4. view the resulting recommendation
+5. inspect the associated workflow information
 
-- Recent workflow activity and application outcomes.
-- Clinical workflow runs with state transitions and validated proposals.
-- Read-only operational information for troubleshooting and demonstrations.
+### Application review views
 
-The console is not access-controlled in this demonstration build.
+The project also contains application-level views for inspecting workflow activity and referral results during development and demonstrations.
+
+These views are intended for engineering/demo use and are **not an authentication or authorisation system**.
 
 ---
 
 ## API
 
-Swagger UI: `http://127.0.0.1:8000/docs`
+The FastAPI backend provides the application API.
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `POST` | `/chat` | Clinician conversation (`message`, optional `conversation_id`) |
-| `POST` | `/referrals` | Governed referral creation (direct, no LLM; optional `date_of_birth` with `patient_name`) |
-| `POST` | `/clinical-workflows` | AI clinical review (`patient_name`, optional `date_of_birth`, `department`, `question`, `idempotency_key`) |
-| `GET` | `/clinical-workflows?limit=` · `/clinical-workflows/{workflow_id}` | Workflow runs and transitions |
-| `GET` | `/clinical-review-requests?limit=` | Human clinical review queue (read-only) |
-| `GET` | `/patients?name=&limit=` · `/patients/{patient_id}` | Patient search and summary |
-| `GET` | `/health` | Liveness of the API process. It does not check OpenAI connectivity |
+Typical endpoints include:
 
-Updates, cancellations and review requests are made through the assistant's governed tools. They have no separate REST endpoint.
+```text
+GET  /health
+POST /chat
+POST /referrals
+GET  /referrals
+PATCH /referrals/{referral_number}
+DELETE /referrals/{referral_number}
+POST /clinical-review
+GET  /clinical-workflows
+```
 
-`POST /referrals` outcomes: `REFERRAL_CREATED` 201 · `PATIENT_NOT_FOUND` 404 · `MULTIPLE_PATIENT_MATCHES` 409 · `INVALID_REQUEST` / `INVALID_PATIENT_ID` 422 · `GOVERNANCE_DENIED` / `GOVERNANCE_TERMINAL` 403 · `INTERNAL_ERROR` 500. `/chat` returns `503 LLM_UNAVAILABLE` when OpenAI is unavailable or `OPENAI_API_KEY` is not configured.
+The exact available routes are defined by `backend/app.py`.
 
-`POST /chat` response:
+### Example chat request
 
-| Field | Meaning |
-|---|---|
-| `reply` | Clinician-facing text. Built from authoritative outcomes when a governed workflow ran; fixed text when an action was denied before running or failed |
-| `agent_reply` | Raw LLM text, for transparency |
-| `referral_attempted`, `workflow_results[]` | Referral workflow outcomes |
-| `clinical_review_attempted`, `clinical_reviews[]` | AI clinical review outcomes |
-| `action_attempted`, `action_results[]` | Update / cancel / review-request outcomes |
-| `conversation_id`, `context` | Conversation to continue; clinician-safe state |
-| `success` | `false` if any outcome failed |
+```json
+{
+  "message": "Create a cardiology referral for Aisha Wiegand because of chest pain.",
+  "conversation_id": null
+}
+```
+
+### Example referral request
+
+```json
+{
+  "patient_name": "Aisha Wiegand",
+  "department": "Cardiology",
+  "reason": "Persistent chest pain"
+}
+```
+
+The backend resolves the patient and validates the request before performing the database write.
 
 ---
 
-## Governance scenarios tested
+## Referral and workflow rules
 
-Each scenario is covered by automated tests that run against a temporary database and ledger. **Browser** means it is also exercised through the real UI in the development browser checks (see Testing).
+The application uses deterministic business rules around referral operations.
 
-| # | Scenario | Expected result | Rule | Tests |
-|---|---|---|---|---|
-| 1 | Valid referral (one complete instruction, or confirmed multi-turn) | ALLOW, one referral written | all create rules | `test_action_governance`, `test_conversation` · browser |
-| 2 | Invented / unknown patient | Workflow `PATIENT_NOT_FOUND`, or pre-tool DENY when the model invents a name; no write | `CLINICAL_DATA_ACCESS_VALID`, `PATIENT_SEARCH_REQUEST_VALID` | `test_chat_intent`, `test_tool_governance` · browser |
-| 3 | Clinical data with no patient established ("what medications is she on?") | DENY; tool body never runs | `CLINICAL_DATA_ACCESS_VALID` | `test_tool_governance`, `test_conversation` · browser |
-| 4 | Unsupported department | DENY via API/agent; in conversation, the assistant lists the supported departments | `REFERRAL_TARGET_VALID` | `test_action_governance`, `test_conversation` |
-| 5 | Duplicate active referral, including via a department alias or an update | DENY, recorded with the duplicate ids | `REFERRAL_NOT_DUPLICATE` | `test_action_governance` · browser |
-| 6 | Update without a staff-supplied referral number, a non-existent or inactive referral, or no real change | DENY | `ACTION_INPUT_GROUNDED`, `REFERRAL_UPDATE_VALID` | `test_tool_governance`, `test_action_governance` |
-| 7 | Cancellation without a reason, or of a cancelled / non-existent referral | DENY | `REFERRAL_CANCEL_VALID` | `test_action_governance` |
-| 8 | Changing another patient's referral | TERMINAL `patient-context-integrity-violation` | `REFERRAL_MUST_BELONG_TO_PATIENT` | `test_action_governance` |
-| 9 | Action for a non-existent patient record | TERMINAL `referral-action-suspended` | `PATIENT_MUST_EXIST` | `test_action_governance`, `test_gates` · browser |
-| 10 | AI cites evidence missing from, or belonging to another patient's, record | DENY, workflow `REVIEW_REQUIRED` | `AI_PROPOSAL_GROUNDED` | `test_clinical_workflow`, `test_action_governance` · browser |
-| 11 | AI proposal for a different patient than its workflow | TERMINAL | `GOVERNANCE_CONTEXT_MUST_MATCH_PATIENT` | `test_action_governance` |
-| 12 | Placeholder or invented reason ("Unknown", "N/A") | Pre-tool DENY | `ACTION_INPUT_GROUNDED` | `test_chat_intent` |
-| 13 | Model tries to create a referral the clinician declined or never confirmed | Pre-tool DENY; nothing created | `REFERRAL_CONFIRMED_BY_STAFF` | `test_conversation` · browser |
-| 14 | Model text claims success after a denial or a tool failure | Fixed "No referral or change was made…" reply | reply policy | `test_conversation`, `test_chat_intent` |
-| 15 | Malformed AI output / AI-supplied UUIDs | `INVALID_PROPOSAL` / fields ignored; governance not called | proposal validation | `test_proposals`, `test_clinical_api` |
-| 16 | Clinical review request: valid, duplicate, missing reason, unknown referral number | ALLOW / DENY | `CLINICAL_REVIEW_REQUEST_VALID` | `test_action_governance` |
-| 17 | Ledger integrity and causal links for every decision type | Chain intact; links resolve within the decision |  ledger | `test_ledger`, `test_action_governance`, `test_tool_governance` |
+### Patient identity
+
+The application must resolve the patient before a referral is created.
+
+```text
+0 matches  → stop
+1 match    → continue
+2+ matches → ask for clarification
+```
+
+### Supported departments
+
+Referral departments are validated against the application's supported department catalogue.
+
+An unsupported department such as:
+
+```text
+XYZ-INVALID-DEPARTMENT
+```
+
+does not become a valid referral target.
+
+### Duplicate protection
+
+The application checks for an existing active referral for the same patient and department.
+
+A request such as:
+
+```text
+Create another Cardiology referral for the same patient.
+```
+
+can be rejected when an active matching referral already exists.
+
+### Updates
+
+An update requires enough information to identify the referral and describe the requested change.
+
+### Cancellation
+
+A cancellation requires:
+
+- the referral being identified
+- the patient context
+- a cancellation reason
+
+### Fail-closed behaviour
+
+When required information cannot be validated, the application stops rather than guessing.
+
+Examples include:
+
+- unknown patient
+- ambiguous patient
+- missing referral reason
+- unsupported department
+- invalid referral number
+- malformed AI proposal
+- failed database operation
+
+---
+
+## Evidence and testing scenarios
+
+The application is designed to demonstrate both successful and unsuccessful workflow paths.
+
+### Scenario 1 — Valid referral
+
+```text
+Create a cardiology referral for Aisha Wiegand
+because of persistent chest pain.
+```
+
+Expected:
+
+```text
+Patient resolved
+      ↓
+Input validated
+      ↓
+Referral created
+```
+
+### Scenario 2 — Missing reason
+
+```text
+Create a referral for Aisha Wiegand to Cardiology.
+```
+
+Expected:
+
+```text
+Request incomplete
+      ↓
+No referral created
+      ↓
+Assistant asks for the missing reason
+```
+
+### Scenario 3 — Unknown patient
+
+```text
+Create a referral for Zebulon Nobody
+to Neurology for migraines.
+```
+
+Expected:
+
+```text
+Patient not found
+      ↓
+No referral created
+```
+
+### Scenario 4 — Ambiguous patient
+
+```text
+Show me information for Ram.
+```
+
+If several synthetic patients match, the application asks the clinician to identify the correct patient.
+
+### Scenario 5 — Unsupported department
+
+```text
+Create a referral for Aisha Wiegand
+to XYZ-INVALID-DEPARTMENT for chest pain.
+```
+
+Expected:
+
+```text
+Unsupported department
+      ↓
+No referral created
+```
+
+### Scenario 6 — Duplicate referral
+
+If an active referral already exists for the same patient and department:
+
+```text
+Create another Cardiology referral for Aisha Wiegand.
+```
+
+Expected:
+
+```text
+Duplicate detected
+      ↓
+No additional referral created
+```
+
+### Scenario 7 — Declined confirmation
+
+A multi-turn referral is prepared and the assistant asks for confirmation.
+
+```text
+Clinician:
+No, cancel that.
+```
+
+Expected:
+
+```text
+Pending referral withdrawn
+      ↓
+No database write
+```
+
+### Scenario 8 — Clinical review
+
+```text
+Review Aisha Wiegand's clinical information.
+```
+
+Expected:
+
+```text
+Patient resolved
+      ↓
+Clinical information retrieved
+      ↓
+AI review performed
+      ↓
+Clinical review result returned
+```
+
+The review request should not automatically be interpreted as a direct referral request.
 
 ---
 
 ## Setup and running locally
 
-Commands are for **Windows PowerShell** from the project root.
+Commands below assume **Windows PowerShell** and the project root.
 
 ### Prerequisites
 
 - Python 3.10+
-- Node.js 20.19+ or 22.12+ (required by Vite)
-- An [OpenAI API key](https://platform.openai.com/api-keys)
-- Git, which is needed to install `-maf` from GitHub
+- Node.js 20.19+ or 22.12+
+- Git
+- OpenAI API key
+- Microsoft Agent Framework dependencies
+- SQLite
 
-### 1. Python environment
+### 1. Create the Python environment
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-Copy-Item .env.example .env      # Set OPENAI_API_KEY; model defaults to gpt-4.1-mini
 ```
 
-### 2. Synthetic patient database
+**What it does:** Creates an isolated Python environment and installs the backend dependencies.
 
-The processed Synthea CSVs ship in `data/processed/`. Build the SQLite database from them:
+### 2. Configure environment variables
+
+Create the local environment file:
 
 ```powershell
-python -m scripts.create_database
-python -m scripts.load_database
-python -m scripts.validate_data       # optional sanity report
+Copy-Item .env.example .env
 ```
 
-To regenerate the population from Synthea, generate FHIR output into `synthea/output/fhir/`, run `python -m scripts.extract_synthea_data`, and then load the database again as above.
+**What it does:** Creates `.env` from the example configuration.
 
-### 3. OpenAI configuration
+Open it:
 
 ```powershell
 notepad .env
 ```
 
-Set `OPENAI_API_KEY` in `.env`. `OPENAI_CHAT_MODEL` is optional and defaults to
-`gpt-4.1-mini`. The backend is the only component that reads this key.
+Set:
 
-### 4. API
-
-```powershell
-python main.py              # or: uvicorn main:app --reload
+```text
+OPENAI_API_KEY=your_api_key_here
 ```
 
-### 5. Frontend (second terminal)
+Do not commit `.env` to Git.
+
+### 3. Create the database
+
+```powershell
+python -m scripts.create_database
+```
+
+**What it does:** Creates the SQLite database schema.
+
+### 4. Load synthetic patient data
+
+```powershell
+python -m scripts.load_database
+```
+
+**What it does:** Loads the processed Synthea CSV data into SQLite.
+
+### 5. Validate the dataset
+
+```powershell
+python -m scripts.validate_data
+```
+
+**What it does:** Runs sanity checks over the processed healthcare dataset.
+
+### 6. Start the backend
+
+From the project root:
+
+```powershell
+python main.py
+```
+
+Alternatively:
+
+```powershell
+uvicorn main:app --reload
+```
+
+The API should be available at:
+
+```text
+http://localhost:8000
+```
+
+### 7. Start the frontend
+
+Open a second PowerShell terminal:
 
 ```powershell
 cd frontend
-npm install                 # first time only
+npm install
 npm run dev
 ```
 
-- Clinician app: `http://localhost:5173/`
-- Review console: `http://localhost:5173/engineering`
+**What it does:** Installs frontend dependencies and starts the Vite development server.
 
-The Vite server proxies `/api/*` to `http://127.0.0.1:8000`; set `XVERBA_API_TARGET` to change this.
+The frontend should be available at:
 
-### 6. Reset the demo state (recommended before a client demo)
+```text
+http://localhost:5173/
+```
 
-Stop the API first, then run:
+### 8. Reset demonstration data
+
+Before a clean demonstration, use:
 
 ```powershell
 python -m scripts.reset_demo_data --yes
 ```
 
-This **renames** `data/` to `data/application audit data`, so earlier evidence is kept. It also removes referrals, review requests and workflow runs, so referral numbers, workflow links and the ledger start fresh together. Patient data is not touched.
+**What it does:** Resets referral/workflow demonstration state while preserving the synthetic patient dataset.
 
-### 7. Live end-to-end script (optional)
+Use this only when you want a clean demo state.
+
+### 9. Optional end-to-end demonstration
 
 ```powershell
 python -m scripts.run_e2e_demo
 ```
 
-This runs referral, not-found, TERMINAL and AI-review scenarios against the configured OpenAI model, and writes to `data/`.
+**What it does:** Runs the project's live OpenAI demonstration scenarios against the configured application.
 
 ---
 
 ## Client demo guide
 
-A suggested flow after a reset, all on synthetic data. Keep the console open in a second tab.
+A simple demonstration flow:
 
-1. **Multi-turn referral.** Run `reset_demo_data` first, so referral numbers start at 1.
-   - "I want to refer a patient" → "Aisha Wiegand" → "Cardiology" → "She has been experiencing chest pain" → "Yes, go ahead".
-   - The *Current conversation* panel fills in. The referral is created only after the "yes".
-2. **Follow-up with a pronoun.** "What medications is she on?" Then show the `TOOL_CALL get_patient_medications` ALLOW in the console.
-3. **Duplicate protection.** "Refer Aisha Wiegand to cardiology because of chest pain" → *Duplicate referral blocked*. In the console: DENY `REFERRAL_NOT_DUPLICATE`, with 7 linked ledger entries.
-4. **Decline.** Build a referral over several turns ("Refer Aisha Wiegand to dermatology", then give the reason when asked). When asked to confirm, answer "No". Nothing is created. A single complete instruction is treated as already confirmed, so use the multi-turn form here.
-5. **Unsupported department.** "Refer Aisha Wiegand to XYZ department for chest pain" → the assistant lists the supported departments. For the governed denial itself, use `POST /referrals` in Swagger with `"department": "XYZ"` → DENY `REFERRAL_TARGET_VALID`.
-6. **Fail closed.**
-   - Start a **New conversation**, then ask "What medications is she on?". The model usually either asks which patient you mean, or calls the tool and gets a pre-tool DENY `CLINICAL_DATA_ACCESS_VALID`, which is visible in the console. Either way, no data is read.
-   - "Refer Zebulon Nobody to neurology for migraines" → patient not found.
-7. **TERMINAL.** In Swagger, `POST /referrals` with `"patient_id": "00000000-0000-0000-0000-000000000000"` → TERMINAL `PATIENT_MUST_EXIST`. Show the TERMINAL entry and its causal chain in the console.
-8. **AI review.** On the *Patient review* tab, choose Aisha Wiegand / Endocrinology, and show the AI recommendation.
-   - If the AI proposes a referral, show its governance decision (`AI_PROPOSAL_GROUNDED`, origin `AI_PROPOSAL`).
-   - A `NO_ACTION` recommendation creates no governance decision.
-   - Then open the run in *Clinical workflows*.
+### 1. Start the application
 
-Two notes for presenters:
-- Synthea names carry numeric suffixes (for example *Aisha756 Melina208 Wiegand701*); typing "Aisha Wiegand" is enough.
-- "Aisha" on its own matches several synthetic patients, which is a good way to show ambiguous-patient handling.
+Run the backend and frontend.
+
+### 2. Demonstrate patient lookup
+
+Ask:
+
+```text
+Show me information for Aisha Wiegand.
+```
+
+Demonstrate that the application resolves the patient and retrieves the relevant clinical information.
+
+### 3. Demonstrate multi-turn referral creation
+
+Use:
+
+```text
+I want to refer a patient.
+```
+
+Then:
+
+```text
+Aisha Wiegand
+```
+
+Then:
+
+```text
+Cardiology
+```
+
+Then:
+
+```text
+She has persistent chest pain.
+```
+
+Finally:
+
+```text
+Yes, go ahead.
+```
+
+Show that the application creates the referral.
+
+### 4. Demonstrate invalid input
+
+Try:
+
+```text
+Create a referral for Aisha Wiegand to XYZ
+for persistent chest pain.
+```
+
+Show that the unsupported department is rejected.
+
+### 5. Demonstrate patient ambiguity
+
+Ask:
+
+```text
+Show me information for Ram.
+```
+
+If several records match, the application asks for additional information rather than selecting a patient automatically.
+
+### 6. Demonstrate duplicate protection
+
+Create a valid referral first, then attempt another referral for the same patient and department.
+
+Show that the second referral is rejected when it violates the application's duplicate rule.
+
+### 7. Demonstrate clinical review
+
+Open the patient review workflow and request an AI-assisted review.
+
+Show:
+
+```text
+Patient
+   ↓
+Clinical data
+   ↓
+AI analysis
+   ↓
+Structured result
+   ↓
+Workflow result
+```
 
 ---
 
 ## Testing
 
-| Suite | Command | Current result |
-|---|---|---|
-| Backend (pytest) | `python -m pytest` | **221 passed** |
-| Frontend unit tests | `cd frontend; npm test` | **31 passed** |
-| Frontend lint | `cd frontend; npm run lint` | clean |
-| Frontend build | `cd frontend; npm run build` | succeeds |
+The project contains backend and frontend tests.
 
-The backend suite runs against a **temporary database and ledger** (`tests/conftest.py`), so `data/` is never touched. It exercises the real MAF function-invocation loop, the real -maf middleware, the real workflows and the real  gates and ledger. OpenAI is replaced by scripted chat clients.
+Typical commands:
 
-| Test file | Focus |
+### Backend
+
+```powershell
+python -m pytest
+```
+
+**What it does:** Runs the Python backend test suite.
+
+### Frontend tests
+
+```powershell
+cd frontend
+npm test
+```
+
+**What it does:** Runs the frontend unit tests.
+
+### Frontend lint
+
+```powershell
+npm run lint
+```
+
+**What it does:** Checks the frontend source for linting problems.
+
+### Frontend build
+
+```powershell
+npm run build
+```
+
+**What it does:** Creates the production frontend build and catches build-time issues.
+
+### Test areas
+
+| Test area | Purpose |
 |---|---|
-| `test_patient_tools.py` | Deterministic resolution, not found, multiple matches, invalid IDs |
-| `test_gates.py`, `test_governance.py`, `test_ledger.py` | ALLOW / DENY / TERMINAL, decision retrieval, causal chain, integrity |
-| `test_referral_tools.py`, `test_api.py` | Referral workflow, fail-closed behaviour, API contract |
-| `test_agent.py` | MAF agent loop, governed middleware, tool invocation |
-| `test_chat_intent.py` | Small talk vs actions, invented patients, placeholder reasons |
-| `test_conversation.py` | Multi-turn state, confirmation and decline, pronouns, department changes and aliases, no false success |
-| `test_tool_governance.py` | Pre-tool governance for every tool; a denied tool never runs |
-| `test_patient_identification.py` | Structured name + date of birth, ambiguous / unknown patients, invented dates, tool failure |
-| `test_action_governance.py` | Create / update / cancel / review-request governance, duplicates, TERMINAL invariants |
-| `test_proposals.py`, `test_clinical_workflow.py`, `test_clinical_api.py` | AI output validation, workflow states, idempotency |
+| Patient tools | Patient resolution, unknown patients and ambiguous matches |
+| API | Endpoint behaviour and contracts |
+| Agent | MAF agent loop and tool invocation |
+| Conversation | Multi-turn state, confirmation and cancellation |
+| Patient identification | Name + date of birth handling |
+| Referral tools | Create, update and cancellation workflows |
+| Clinical workflow | AI output validation and workflow state |
+| Proposals | Structured AI output validation |
+| Frontend | UI behaviour and component tests |
 
-**Browser checks.** During development the UI was also exercised end to end in a headless Chromium (Playwright): 170 checks across the clinician app and the console, covering Phases 1–3, against the real backend with a scripted model client. That harness is not part of this repository.
-
-**Live model.** OpenAI model behaviour itself is not covered by the automated suites. Verify it with `OPENAI_API_KEY` configured, using the demo guide or `scripts/run_e2e_demo.py`.
+The backend tests use isolated test data where configured, so development tests should not depend on the production/demo database state.
 
 ---
 
@@ -427,72 +917,191 @@ The backend suite runs against a **temporary database and ledger** (`tests/conft
 Healthcare-Referral-Agent/
 ├── backend/
 │   ├── app.py                  # FastAPI endpoints
-│   ├── chat.py                 # ChatService: routing, authoritative replies
-│   ├── conversation.py         # conversation state, slot filling, confirmation
-│   ├── agent.py                # MAF agent (OpenAI API · gpt-4.1-mini) + instructions
-│   ├── agent_tools.py          # the 12 agent tools
-│   ├── workflow.py             # ReferralWorkflow, GovernedActionWorkflow
-│   ├── actions.py              # the single governed writer
-│   ├── patient_resolution.py   # deterministic name → patient
-│   ├── clinical_workflow.py    # AI clinical review workflow + states
-│   ├── clinical_context.py     # record retrieval, bounded context
-│   ├── analysis.py             # OpenAI analysis (untrusted)
-│   ├── proposals.py            # AI output → validated proposal; department catalogue
-│   ├── clinical_runs.py        # workflow run persistence
-│   ├── domain.py, schemas.py   # domain types, API schemas
-│   ├── tools/patient_tools.py  # read-only clinical data access
-│   └── database/               # SQLAlchemy models, connection, schema
-├── frontend/src/
-│   ├── api.js                  # the only backend client
-│   ├── lib/                    # outcome mapping, ledger helpers (+ tests)
-│   ├── clinician/              # /             clinician app
-│   └── engineering/            # /engineering  Review console
+│   ├── chat.py                 # ChatService and response handling
+│   ├── conversation.py         # Conversation state and confirmation
+│   ├── agent.py                # Microsoft Agent Framework + OpenAI agent
+│   ├── agent_tools.py          # Agent tools
+│   ├── workflow.py             # Referral workflow
+│   ├── actions.py              # Controlled database actions
+│   ├── patient_resolution.py   # Deterministic name → patient resolution
+│   ├── clinical_workflow.py    # AI clinical review workflow
+│   ├── clinical_context.py     # Bounded clinical context retrieval
+│   ├── analysis.py             # OpenAI clinical analysis
+│   ├── proposals.py            # AI proposal validation
+│   ├── clinical_runs.py        # Workflow run persistence
+│   ├── domain.py               # Domain types
+│   ├── schemas.py              # API schemas
+│   ├── tools/
+│   │   └── patient_tools.py    # Read-only patient data tools
+│   └── database/
+│       ├── connection.py
+│       └── models.py
+│
+├── frontend/
+│   └── src/
+│       ├── api.js              # Backend API client
+│       ├── clinician/          # Clinician-facing application
+│       ├── components/         # Shared UI components
+│       └── lib/                # Frontend utilities
+│
 ├── scripts/
-│   ├── create_database.py, load_database.py, validate_data.py, extract_synthea_data.py
-│   ├── reset_demo_data.py      # archive ledger + clear governed records
-│   ├── run_e2e_demo.py         # live OpenAI demonstration
-│   └── legacy/                 # early ad-hoc scripts, not maintained
-├── tests/                      # pytest suites (temporary DB and ledger)
-├── docs/                       # technical report (.docx) + screenshots (see Evidence collected)
-├── data/                       # processed CSVs, healthcare.db, application audit data
-├── main.py · requirements.txt · requirements-lock.txt · pytest.ini · .env.example
+│   ├── create_database.py
+│   ├── load_database.py
+│   ├── validate_data.py
+│   ├── extract_synthea_data.py
+│   ├── reset_demo_data.py
+│   ├── run_e2e_demo.py
+│   └── legacy/
+│
+├── tests/
+│   ├── test_agent.py
+│   ├── test_api.py
+│   ├── test_conversation.py
+│   ├── test_patient_identification.py
+│   ├── test_clinical_workflow.py
+│   └── ...
+│
+├── data/
+│   └── processed/
+│
+├── docs/
+├── main.py
+├── requirements.txt
+├── requirements-lock.txt
+├── pytest.ini
+└── .env.example
 ```
 
 ---
 
 ## Design principles
 
-- **Validate before side effects.** Consequential actions are checked before they execute.
-- **Fail closed.** Unresolved patients, invalid inputs and tool failures do not become successful actions.
-- **Deterministic identity.** The LLM never supplies or selects patient identifiers.
-- **No guessing.** Ambiguous patients are never resolved arbitrarily, and reasons are never invented.
-- **The clinician confirms.** Conversational referrals require confirmation where appropriate.
-- **Truthful replies.** User-facing results come from actual backend outcomes, not model claims.
-- **Separation of concerns.** AI reasoning, application workflows and persistence remain separate.
+### 1. AI is not the database
+
+The model interprets natural language, but application code determines what is actually written to the database.
+
+### 2. Deterministic patient identity
+
+The model does not choose internal patient identifiers.
+
+### 3. No guessing
+
+The application does not arbitrarily select between multiple patients.
+
+### 4. Validate before writing
+
+Referral inputs are validated before the database is changed.
+
+### 5. Separate read and write operations
+
+Clinical data retrieval is separated from referral-changing operations.
+
+### 6. Explicit workflow states
+
+Multi-turn referral conversations maintain structured state instead of relying entirely on free-form model memory.
+
+### 7. Truthful responses
+
+The application should report what actually happened rather than allowing the model to claim a successful action that did not occur.
+
+### 8. Synthetic data only
+
+All patient information used for this demonstration comes from synthetic data.
 
 ---
 
 ## Known limitations
 
-**Not production-ready by design:**
-- No authentication or authorisation. The `/engineering` console is not access-controlled.
-- Synthetic data only; no healthcare interoperability (FHIR APIs, EHR integration).
-- No human authorisation workflow. TERMINAL decisions and `REVIEW_REQUIRED` outcomes are recorded but cannot be approved, overridden or re-enabled (`HUMAN_AUTHORISED_TRANSITION` / `SPECIFICATION_UPDATE` are not written). Ledger audit checks 4 and 5 therefore fail for TERMINAL decisions.
-- `clinical_review_requests` is a queue only; there is no reviewer screen.
+This project is a demonstration build and is **not production-ready**.
 
-**Behavioural boundaries:**
-- Any LLM can over-call tools or phrase things poorly. Governance and the fixed replies contain this, but live model behaviour is not covered by the automated suites.
-- Slot filling is deterministic and English-only. Anything it doesn't recognise goes to the model, which is still governed.
-- A **patient review** that governance allows creates the referral it proposes without a separate confirmation step (Phase 2 design).
-- Grounding rules check *where* an input came from and *whether* evidence exists. They do not judge clinical appropriateness.
-- Duplicate protection treats "same patient + same department + PENDING" as a duplicate and has no cross-request locking. Two simultaneous identical requests could both pass.
-- Updates and cancellations are traced through the ledger MONITOR (referral number and change). The referral row keeps the decision id of its creation.
+### Security and identity
 
-**Operational:**
-- Conversations live in server memory: they are lost on restart and expire after 2 hours. An unknown or expired `conversation_id` silently starts a new conversation.
-- `/health` reports API liveness only. It does not check OpenAI connectivity or the database.
-- The `/chat` response also carries patient IDs inside its structured result objects for API consumers. The clinician UI never displays them.
-- Synthetic records can contain sensitive findings, as Synthea generates them. Choose demo questions accordingly.
+- No production authentication or authorisation system is included.
+- Role-based access control is not implemented.
+- The application should not be exposed publicly with real healthcare data.
+- Secrets must be supplied through environment configuration and never committed to Git.
+
+### Healthcare integration
+
+- The application uses SQLite.
+- It does not currently integrate with a production EHR/EMR.
+- FHIR-based interoperability is not implemented as a production integration.
+- Synthetic Synthea data is used instead of real clinical records.
+
+### Human review
+
+The current application does not provide a complete production human-in-the-loop authorisation system.
+
+A future implementation should provide:
+
+- reviewer identity
+- role-based permissions
+- review queues
+- explicit approval/rejection
+- audit history
+- escalation rules
+
+### AI limitations
+
+- LLM output can be incorrect or poorly phrased.
+- AI recommendations are not a substitute for clinical judgement.
+- Automated tests use controlled model clients where applicable and do not guarantee live-model behaviour.
+- Clinical grounding checks whether cited information exists in the available patient record; they do not determine whether a recommendation is clinically appropriate.
+
+### Operational limitations
+
+- Conversations are stored in application memory.
+- Conversations can be lost when the server restarts.
+- `/health` is an application liveness check rather than a complete dependency health check.
+- SQLite is appropriate for this demonstration but is not the target architecture for a high-scale production healthcare system.
+
+---
+
+## Real-world applicability
+
+The architectural pattern demonstrated here can be extended to enterprise healthcare workflows where an AI assistant helps staff perform administrative or clinical-support tasks.
+
+A production architecture could look like:
+
+```text
+EHR / EMR / FHIR
+       ↓
+Enterprise application
+       ↓
+AI agent
+       ↓
+Structured action proposal
+       ↓
+Application validation
+       ↓
+Identity + authorisation
+       ↓
+Risk assessment
+       ↓
+Human review where required
+       ↓
+Controlled business action
+       ↓
+Audit / monitoring
+```
+
+Potential production capabilities include:
+
+- FHIR-based EHR integration
+- enterprise identity
+- RBAC
+- human-in-the-loop review
+- durable workflow state
+- production database
+- observability
+- model/version tracking
+- privacy controls
+- security monitoring
+- disaster recovery
+- CI/CD
+- cloud deployment
+
+The current project should be viewed as a technical demonstration of an AI-assisted healthcare workflow rather than as a deployable clinical product.
 
 ---
 
@@ -500,25 +1109,57 @@ Healthcare-Referral-Agent/
 
 | Phase | Scope | Status |
 |---|---|---|
-| 1. Healthcare Referral Agent | Referral workflow, patient resolution and UI | ✅ Implemented |
-| 2. Clinical Workflow / Clinical Review | AI clinical review, proposal validation and workflow tracking | ✅ Implemented |
-| 3. Conversation and tool handling | Multi-turn state, confirmation, structured name + DOB, update/cancel/review actions | ✅ Implemented |
-| 4. Identity / RBAC | Authentication, roles and service identity | 🔜 Proposed |
-| 5. Human-in-the-loop | Review queue, reviewer decisions and escalation | 🔜 Proposed |
-| 6. Production data integration | EHR/EMR via FHIR and enterprise identity | 🔜 Proposed |
-| 7. Observability and analytics | Operational dashboards, model/version tracking and evidence lineage | 🔜 Proposed |
-| 8. Cloud / DevOps | Containers, CI/CD, secrets, monitoring and disaster recovery | 🔜 Proposed |
+| 1. Healthcare Referral Agent | Patient resolution, referral workflow, UI and database | Implemented |
+| 2. Clinical Review | AI clinical review, proposal validation and workflow tracking | Implemented |
+| 3. Conversation improvements | Multi-turn state, confirmation, structured patient identification, update/cancel/review actions | Implemented |
+| 4. Identity / RBAC | Authentication, roles and enterprise identity | Planned |
+| 5. Human-in-the-loop | Review queue, reviewer decisions and escalation | Planned |
+| 6. Production data integration | EHR/EMR and FHIR integration | Planned |
+| 7. Production database | Scalable relational database and durable workflow state | Planned |
+| 8. Observability | Metrics, logging, tracing and operational dashboards | Planned |
+| 9. Cloud / DevOps | Containers, CI/CD, secrets management and cloud deployment | Planned |
+| 10. Enterprise security | Privacy, security controls, auditing and compliance processes | Planned |
 
 ---
 
 ## Disclaimer
 
-This project uses synthetic healthcare data generated for development and demonstration purposes. It is not a production clinical system and must not be used for real patient care, diagnosis or clinical decision-making.
+This project uses synthetic healthcare data generated for development and demonstration purposes.
+
+It is **not a production clinical system** and must not be used for:
+
+- real patient care
+- diagnosis
+- treatment decisions
+- medication decisions
+- clinical decision-making without qualified professional oversight
+
+Any future production deployment would require appropriate clinical validation, security review, privacy controls, regulatory assessment, human oversight and enterprise integration.
 
 ---
 
-## Healthcare Referral Agent
+## License
 
-Built as a demonstration of AI-assisted healthcare referral workflows using Microsoft Agent Framework, OpenAI, FastAPI, React and synthetic Synthea data.
+Add the project's chosen license here before public distribution.
 
-> **AI can reason about an action. The application validates and controls whether that action can execute.**
+---
+
+## Project purpose
+
+This repository demonstrates how **Microsoft Agent Framework, OpenAI, FastAPI, React, SQLite and synthetic healthcare data** can be combined to build an AI-assisted healthcare referral workflow.
+
+The focus is on:
+
+```text
+Natural-language interaction
+        ↓
+Agent orchestration
+        ↓
+Deterministic application logic
+        ↓
+Validated workflow
+        ↓
+Controlled database action
+```
+
+The goal is to make AI-assisted workflow automation more predictable, testable and understandable while keeping the final application responsible for business rules and system state.
